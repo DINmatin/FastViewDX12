@@ -2,6 +2,8 @@
 
 FastView is a small Windows 3D viewer for **GLB** and **glTF** files. It uses WinForms and Direct3D 12 and includes Windows Explorer thumbnail providers.
 
+![FastViewDX12 preview](docs/images/fastview-preview.png)
+
 ## Current features
 
 - Open `.glb` and `.gltf` files from the command line, drag-and-drop, or **Open with**.
@@ -81,11 +83,25 @@ installer/                        Inno Setup project
 docs/                             Testing and release notes
 ```
 
-## Licensing before publishing
+## Free sample model
 
-A project license has deliberately **not** been chosen automatically. Before making the repository public, add the license you want to use and confirm that `Assets/Environment/default.exr` and both icon files are yours or redistributable under compatible terms.
+A free GLB model is included for testing FastViewDX12:
 
-Third-party package information is listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+[Download FastViewDemo.glb](samples/FastViewDemo.glb)
+
+The sample model is released under CC0 1.0. See
+[`samples/README.md`](samples/README.md) for details.
+
+### License
+
+FastViewDX12 and its source code are licensed under the
+[MIT License](LICENSE).
+
+The sample model in `samples/` is released separately under the
+Creative Commons CC0 1.0 Universal Public Domain Dedication.
+
+Third-party assets and package information are listed in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Developer documentation
 
