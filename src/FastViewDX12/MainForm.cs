@@ -1,0 +1,170 @@
+using System;
+using System.Diagnostics;
+using System.Drawing;
+using System.IO;
+using System.Windows.Forms;
+
+namespace FastViewDX12;
+
+/// <summary>
+/// Interactive WinForms shell for FastView. Rendering remains in <see cref="Dx12Renderer"/>.
+/// </summary>
+public sealed partial class MainForm : Form
+{
+    private readonly Panel _renderPanel;
+
+    private readonly MenuStrip _menuStrip;
+
+    private readonly string? _startupModelPath;
+
+    private readonly Dx12Renderer _renderer;
+
+    private bool _isRotatingLight;
+
+    private readonly string _stateFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FastViewDX12");
+
+    private string LastModelPathFile => Path.Combine(_stateFolder, "lastModel.txt");
+
+    private static string DefaultEnvironmentMapPath =>
+    Path.Combine(
+        AppContext.BaseDirectory,
+        "Assets",
+        "Environment",
+        "default.exr");
+
+    /// <summary>
+    /// Creates the interactive FastView window, render surface, menus, input routing, and idle render loop.
+    /// </summary>
+    /// <param name="startupModelPath">Optional model path supplied on the command line.</param>
+    public MainForm(string? startupModelPath = null)
+    {
+        Text = "FastViewDX12";
+        ClientSize = new Size(1600, 900);
+        StartPosition = FormStartPosition.CenterScreen;
+        _startupModelPath = startupModelPath;
+        Icon? executableIcon =
+    Icon.ExtractAssociatedIcon(
+        Application.ExecutablePath);
+
+        if (executableIcon != null)
+        {
+            Icon =
+                executableIcon;
+        }
+
+        ShowIcon =
+            true;
+
+        _renderPanel = new Panel
+        {
+            Dock = DockStyle.Fill,
+            BackColor = Color.FromArgb(
+                20,
+                20,
+                26),
+
+            AllowDrop = true
+        };
+
+
+
+        _renderer = new Dx12Renderer(_renderPanel);
+
+        _menuStrip =
+    CreateMainMenu();
+
+        Controls.Add(
+            _renderPanel);
+
+        Controls.Add(
+            _menuStrip);
+
+        MainMenuStrip =
+            _menuStrip;
+
+        _menuStrip.BringToFront();
+
+        _renderPanel.HandleCreated += (_, _) => { _renderer.Initialize(); TryLoadDefaultEnvironmentMap(); TryLoadStartupModel(); };
+        _renderPanel.Resize += (_, _) => _renderer.Resize();
+        _renderPanel.DragEnter += RenderPanel_DragEnter;
+        _renderPanel.DragDrop += RenderPanel_DragDrop;
+
+        _renderPanel.MouseDown += RenderPanel_MouseDown;
+        _renderPanel.MouseMove += RenderPanel_MouseMove;
+        _renderPanel.MouseUp += RenderPanel_MouseUp;
+        _renderPanel.MouseWheel += RenderPanel_MouseWheel;
+
+        KeyPreview = true; KeyDown += MainForm_KeyDown;
+
+        Application.Idle += OnApplicationIdle;
+    }
+
+    /// <summary>
+    /// Loads the bundled EXR environment map when it is available and leaves the fallback environment active otherwise.
+    /// </summary>
+    private void TryLoadDefaultEnvironmentMap()
+    {
+        string path =
+            DefaultEnvironmentMapPath;
+
+        if (!File.Exists(path))
+        {
+            Debug.WriteLine(
+                $"Default environment map not found: {path}");
+
+            return;
+        }
+
+        try
+        {
+            _renderer.LoadEnvironmentMap(path);
+
+            Debug.WriteLine(
+                $"Default environment map loaded: {path}");
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine(
+                $"Could not load default environment map: {ex}");
+        }
+    }
+
+    /// <summary>
+    /// Renders continuously while the Windows message queue is empty.
+    /// </summary>
+    private void OnApplicationIdle(object? sender, EventArgs e)
+    {
+        while (AppStillIdle)
+        {
+            _renderer.Render();
+        }
+    }
+
+    private static bool AppStillIdle
+    {
+        get
+        {
+            NativeMethods.PeekMessage(out var msg, IntPtr.Zero, 0, 0, 0);
+            return msg.message == 0;
+        }
+    }
+
+    /// <summary>
+    /// Stops idle rendering and disposes the Direct3D renderer and WinForms components.
+    /// </summary>
+    protected override void Dispose(
+    bool disposing)
+    {
+        if (disposing)
+        {
+            Application.Idle -=
+                OnApplicationIdle;
+
+            _renderer.Dispose();
+        }
+
+        base.Dispose(
+            disposing);
+    }
+
+}

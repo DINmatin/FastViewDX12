@@ -1,0 +1,36 @@
+# Visual Studio / .NET
+.vs/
+**/bin/
+**/obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Build and release output
+artifacts/
+installer/Payload/*
+!installer/Payload/.gitkeep
+installer/Output/*
+!installer/Output/.gitkeep
+*.pdb
+
+# Generated shader bytecode
+src/FastViewDX12/Shaders/*.cso
+
+# Runtime diagnostics and local tests
+*.error.txt
+*.log.txt
+manual-test*.png
+FastView_ThumbnailProvider_*.txt
+FastViewDX12_Thumbnail_Startup.txt
+
+# OS / editor noise
+Thumbs.db
+Desktop.ini
+.DS_Store
+.idea/
+.vscode/
+
+# Archives are release artifacts, not source
+*.zip

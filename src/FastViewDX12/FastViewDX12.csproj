@@ -1,0 +1,77 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Platforms>x64</Platforms>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ApplicationIcon>Assets\Icons\FastView.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="SharpGLTF.Core" Version="1.0.6" />
+    <PackageReference Include="TinyEXR.NET" Version="1.0.0" />
+    <PackageReference Include="Vortice.Direct3D12" Version="3.8.3" />
+    <PackageReference Include="Vortice.DirectX" Version="3.8.3" />
+    <PackageReference Include="Vortice.DXGI" Version="3.8.3" />
+    <PackageReference Include="Microsoft.Direct3D.DXC"
+                      Version="1.9.2602.24"
+                      GeneratePathProperty="true"
+                      PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Shaders\SimpleVS.cso">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+
+    <Content Include="Shaders\SimplePS.cso">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+
+    <Content Include="Shaders\BackgroundVS.cso">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+
+    <Content Include="Shaders\BackgroundPS.cso">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+
+    <None Update="Assets\Environment\default.exr">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </None>
+
+    <None Update="Assets\Icons\GlbFile.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Assets\Environment\" />
+    <Folder Include="Assets\Icons\" />
+  </ItemGroup>
+  <Target Name="CompileFastViewShaders"
+          BeforeTargets="BeforeBuild"
+          Inputs="$(ProjectDir)Shaders\Simple.hlsl;$(ProjectDir)Shaders\Background.hlsl"
+          Outputs="$(ProjectDir)Shaders\SimpleVS.cso;$(ProjectDir)Shaders\SimplePS.cso;$(ProjectDir)Shaders\BackgroundVS.cso;$(ProjectDir)Shaders\BackgroundPS.cso">
+    <PropertyGroup>
+      <FastViewDxc>$(PkgMicrosoft_Direct3D_DXC)\build\native\bin\x64\dxc.exe</FastViewDxc>
+    </PropertyGroup>
+
+    <Error Condition="!Exists('$(FastViewDxc)')"
+           Text="DXC was not found at $(FastViewDxc). Restore NuGet packages and build again." />
+
+    <Exec Command="&quot;$(FastViewDxc)&quot; -nologo -T vs_6_0 -E VSMain -Fo &quot;$(ProjectDir)Shaders\SimpleVS.cso&quot; &quot;$(ProjectDir)Shaders\Simple.hlsl&quot;" />
+    <Exec Command="&quot;$(FastViewDxc)&quot; -nologo -T ps_6_0 -E PSMain -Fo &quot;$(ProjectDir)Shaders\SimplePS.cso&quot; &quot;$(ProjectDir)Shaders\Simple.hlsl&quot;" />
+    <Exec Command="&quot;$(FastViewDxc)&quot; -nologo -T vs_6_0 -E VSMain -Fo &quot;$(ProjectDir)Shaders\BackgroundVS.cso&quot; &quot;$(ProjectDir)Shaders\Background.hlsl&quot;" />
+    <Exec Command="&quot;$(FastViewDxc)&quot; -nologo -T ps_6_0 -E PSMain -Fo &quot;$(ProjectDir)Shaders\BackgroundPS.cso&quot; &quot;$(ProjectDir)Shaders\Background.hlsl&quot;" />
+  </Target>
+</Project>
