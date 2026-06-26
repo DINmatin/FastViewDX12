@@ -148,18 +148,27 @@ public sealed partial class Dx12Renderer : IDisposable
         public System.Numerics.Vector3 Position;
         public System.Numerics.Vector3 Normal;
         public System.Numerics.Vector4 Tangent;
-        public System.Numerics.Vector2 TexCoord;
+        public System.Numerics.Vector2 BaseColorTexCoord;
+        public System.Numerics.Vector2 NormalTexCoord;
+        public System.Numerics.Vector2 MetallicRoughnessTexCoord;
+        public System.Numerics.Vector2 EmissiveTexCoord;
 
         public VertexPositionNormalTangentTexture(
             System.Numerics.Vector3 position,
             System.Numerics.Vector3 normal,
             System.Numerics.Vector4 tangent,
-            System.Numerics.Vector2 texCoord)
+            System.Numerics.Vector2 baseColorTexCoord,
+            System.Numerics.Vector2 normalTexCoord,
+            System.Numerics.Vector2 metallicRoughnessTexCoord,
+            System.Numerics.Vector2 emissiveTexCoord)
         {
             Position = position;
             Normal = normal;
             Tangent = tangent;
-            TexCoord = texCoord;
+            BaseColorTexCoord = baseColorTexCoord;
+            NormalTexCoord = normalTexCoord;
+            MetallicRoughnessTexCoord = metallicRoughnessTexCoord;
+            EmissiveTexCoord = emissiveTexCoord;
         }
     }
 

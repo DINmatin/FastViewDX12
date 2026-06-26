@@ -141,6 +141,11 @@ public static class GltfSceneLoader
                     primitive,
                     "TEXCOORD_0");
 
+            Vector2[] texCoords1 =
+                TryGetVector2Accessor(
+                    primitive,
+                    "TEXCOORD_1");
+
             int[] indices =
                 TryGetIndices(
                     primitive,
@@ -156,21 +161,39 @@ public static class GltfSceneLoader
                 indices,
                 world);
 
-            Vector4[] tangents =
-                PrepareTangents(
-                    sourceTangents,
-                    positions,
-                    normals,
-                    texCoords0,
-                    indices,
-                    world);
-
             int materialIndex =
                 GetOrCreateMaterialIndex(
                     primitive.Material,
                     sceneData,
                     materialIndices,
                     ref defaultMaterialIndex);
+
+            MaterialData material =
+                sceneData.Materials[materialIndex];
+
+            Vector2[] tangentTexCoords =
+                ResolveTextureCoordinates(
+                    texCoords0,
+                    texCoords1,
+                    material.NormalTextureMapping,
+                    positions.Length);
+
+            bool normalMappingChangesTangentBasis =
+                material.NormalTextureBytes is { Length: > 0 } &&
+                (material.NormalTextureMapping.TextureCoordinate != 0 ||
+                 !material.NormalTextureMapping.Transform.Equals(
+                     Matrix3x2.Identity));
+
+            Vector4[] tangents =
+                PrepareTangents(
+                    normalMappingChangesTangentBasis
+                        ? Array.Empty<Vector4>()
+                        : sourceTangents,
+                    positions,
+                    normals,
+                    tangentTexCoords,
+                    indices,
+                    world);
 
             string meshName =
                 primitiveNumber == 0
@@ -185,6 +208,7 @@ public static class GltfSceneLoader
                 Normals = normals,
                 Tangents = tangents,
                 TexCoords0 = texCoords0,
+                TexCoords1 = texCoords1,
                 Indices = indices
             };
 
@@ -193,7 +217,8 @@ public static class GltfSceneLoader
                 $"vertices={positions.Length}, " +
                 $"normals={normals.Length}, " +
                 $"tangents={tangents.Length}, " +
-                $"uvs={texCoords0.Length}, " +
+                $"uv0={texCoords0.Length}, " +
+                $"uv1={texCoords1.Length}, " +
                 $"indices={indices.Length}, " +
                 $"material={materialIndex}");
 
@@ -305,7 +330,8 @@ public static class GltfSceneLoader
             result.BaseColorTextureBytes =
                 ReadChannelTexture(
                     baseColorChannel.Value,
-                    "BaseColor");
+                    "BaseColor",
+                    result.BaseColorTextureMapping);
         }
 
         MaterialChannel? normalChannel =
@@ -323,7 +349,8 @@ public static class GltfSceneLoader
             result.NormalTextureBytes =
                 ReadChannelTexture(
                     normalChannel.Value,
-                    "Normal");
+                    "Normal",
+                    result.NormalTextureMapping);
         }
 
         MaterialChannel? metallicRoughnessChannel =
@@ -347,7 +374,8 @@ public static class GltfSceneLoader
             result.MetallicRoughnessTextureBytes =
                 ReadChannelTexture(
                     metallicRoughnessChannel.Value,
-                    "MetallicRoughness");
+                    "MetallicRoughness",
+                    result.MetallicRoughnessTextureMapping);
         }
 
         MaterialChannel? emissiveChannel =
@@ -362,7 +390,8 @@ public static class GltfSceneLoader
             result.EmissiveTextureBytes =
                 ReadChannelTexture(
                     emissiveChannel.Value,
-                    "Emissive");
+                    "Emissive",
+                    result.EmissiveTextureMapping);
         }
 
         Debug.WriteLine(
@@ -797,6 +826,43 @@ public static class GltfSceneLoader
     }
 
     /// <summary>
+    /// Selects TEXCOORD_0 or TEXCOORD_1 and applies one material channel's
+    /// KHR_texture_transform matrix. The resolved coordinates are also used
+    /// when fallback tangents must be generated for a transformed normal map.
+    /// </summary>
+    private static Vector2[] ResolveTextureCoordinates(
+        Vector2[] texCoords0,
+        Vector2[] texCoords1,
+        TextureMappingData mapping,
+        int vertexCount)
+    {
+        Vector2[] source =
+            mapping.TextureCoordinate switch
+            {
+                0 => texCoords0,
+                1 => texCoords1,
+                _ => Array.Empty<Vector2>()
+            };
+
+        if (source.Length != vertexCount)
+        {
+            return Array.Empty<Vector2>();
+        }
+
+        var result =
+            new Vector2[source.Length];
+
+        for (int i = 0; i < source.Length; i++)
+        {
+            result[i] =
+                mapping.Apply(
+                    source[i]);
+        }
+
+        return result;
+    }
+
+    /// <summary>
     /// Reads a material factor array while supplying a complete fallback vector.
     /// </summary>
     private static float GetFactorOrDefault(
@@ -820,15 +886,31 @@ public static class GltfSceneLoader
     /// </summary>
     private static byte[]? ReadChannelTexture(
         MaterialChannel channel,
-        string channelName)
+        string channelName,
+        TextureMappingData mapping)
     {
-        if (channel.TextureCoordinate != 0)
+        TextureTransform? textureTransform =
+            channel.TextureTransform;
+
+        mapping.TextureCoordinate =
+            textureTransform?.TextureCoordinateOverride ??
+            channel.TextureCoordinate;
+
+        mapping.Transform =
+            textureTransform?.Matrix ??
+            Matrix3x2.Identity;
+
+        if (mapping.TextureCoordinate is < 0 or > 1)
         {
             Debug.WriteLine(
-                $"{channelName} uses TEXCOORD_" +
-                $"{channel.TextureCoordinate}. " +
-                "The viewer currently supports only TEXCOORD_0.");
+                $"{channelName} uses unsupported TEXCOORD_" +
+                $"{mapping.TextureCoordinate}. " +
+                "FastView currently supports TEXCOORD_0 and TEXCOORD_1.");
         }
+
+        Debug.WriteLine(
+            $"{channelName}: TEXCOORD_{mapping.TextureCoordinate}, " +
+            $"UV transform={mapping.Transform}.");
 
         Texture? texture =
             channel.Texture;

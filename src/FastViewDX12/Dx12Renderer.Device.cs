@@ -231,6 +231,27 @@ public sealed partial class Dx12Renderer
                 0,
                 Format.R32G32_Float,
                 40,
+                0),
+
+            new InputElementDescription(
+                "TEXCOORD",
+                1,
+                Format.R32G32_Float,
+                48,
+                0),
+
+            new InputElementDescription(
+                "TEXCOORD",
+                2,
+                Format.R32G32_Float,
+                56,
+                0),
+
+            new InputElementDescription(
+                "TEXCOORD",
+                3,
+                Format.R32G32_Float,
+                64,
                 0)
         ];
 

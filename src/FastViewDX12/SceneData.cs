@@ -32,6 +32,33 @@ public sealed class SceneData
 }
 
 /// <summary>
+/// Describes which glTF texture-coordinate set a material channel uses and
+/// the optional KHR_texture_transform matrix applied before sampling.
+/// </summary>
+public sealed class TextureMappingData
+{
+    /// <summary>
+    /// Gets or sets the TEXCOORD_n set selected by the texture channel.
+    /// </summary>
+    public int TextureCoordinate { get; set; }
+
+    /// <summary>
+    /// Gets or sets the affine UV transform. Identity means no transform.
+    /// </summary>
+    public Matrix3x2 Transform { get; set; } = Matrix3x2.Identity;
+
+    /// <summary>
+    /// Applies the channel's KHR_texture_transform matrix to one UV coordinate.
+    /// </summary>
+    public Vector2 Apply(Vector2 textureCoordinate)
+    {
+        return Vector2.Transform(
+            textureCoordinate,
+            Transform);
+    }
+}
+
+/// <summary>
 /// Renderer-neutral glTF material data, including encoded texture payloads and physically based factors.
 /// </summary>
 public sealed class MaterialData
@@ -50,6 +77,18 @@ public sealed class MaterialData
 
     /// <summary>Gets or sets encoded emissive image bytes.</summary>
     public byte[]? EmissiveTextureBytes { get; set; }
+
+    /// <summary>Gets the UV set and transform used by the base-color texture.</summary>
+    public TextureMappingData BaseColorTextureMapping { get; } = new();
+
+    /// <summary>Gets the UV set and transform used by the normal texture.</summary>
+    public TextureMappingData NormalTextureMapping { get; } = new();
+
+    /// <summary>Gets the UV set and transform used by the metallic-roughness texture.</summary>
+    public TextureMappingData MetallicRoughnessTextureMapping { get; } = new();
+
+    /// <summary>Gets the UV set and transform used by the emissive texture.</summary>
+    public TextureMappingData EmissiveTextureMapping { get; } = new();
 
     /// <summary>Gets or sets the linear RGBA base-color multiplier.</summary>
     public Vector4 BaseColorFactor { get; set; } = Vector4.One;
@@ -101,6 +140,9 @@ public sealed class MeshData
 
     /// <summary>Gets or sets the primary texture-coordinate channel.</summary>
     public Vector2[] TexCoords0 { get; set; } = Array.Empty<Vector2>();
+
+    /// <summary>Gets or sets the secondary texture-coordinate channel.</summary>
+    public Vector2[] TexCoords1 { get; set; } = Array.Empty<Vector2>();
 
     /// <summary>Gets or sets triangle-list indices. An empty array represents non-indexed geometry.</summary>
     public int[] Indices { get; set; } = Array.Empty<int>();

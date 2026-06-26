@@ -4,7 +4,7 @@ cbuffer SceneBuffer : register(b0)
 
     float4 CameraPosition;
     float4 LightDirection;
-        // x = Environment rotation in radians
+    // x = Environment rotation in radians
     // y = Environment intensity
     // z = Direct light intensity
     // w = highest environment mip level
@@ -36,7 +36,10 @@ struct VSInput
     float3 Position : POSITION;
     float3 Normal : NORMAL;
     float4 Tangent : TANGENT;
-    float2 TexCoord : TEXCOORD;
+    float2 BaseColorTexCoord : TEXCOORD0;
+    float2 NormalTexCoord : TEXCOORD1;
+    float2 MetallicRoughnessTexCoord : TEXCOORD2;
+    float2 EmissiveTexCoord : TEXCOORD3;
 };
 
 struct VSOutput
@@ -46,7 +49,10 @@ struct VSOutput
     float3 WorldPosition : TEXCOORD0;
     float3 Normal : TEXCOORD1;
     float4 Tangent : TEXCOORD2;
-    float2 TexCoord : TEXCOORD3;
+    float2 BaseColorTexCoord : TEXCOORD3;
+    float2 NormalTexCoord : TEXCOORD4;
+    float2 MetallicRoughnessTexCoord : TEXCOORD5;
+    float2 EmissiveTexCoord : TEXCOORD6;
 };
 
 static const float PI =
@@ -277,8 +283,17 @@ VSOutput VSMain(
     output.Tangent =
         input.Tangent;
 
-    output.TexCoord =
-        input.TexCoord;
+    output.BaseColorTexCoord =
+        input.BaseColorTexCoord;
+
+    output.NormalTexCoord =
+        input.NormalTexCoord;
+
+    output.MetallicRoughnessTexCoord =
+        input.MetallicRoughnessTexCoord;
+
+    output.EmissiveTexCoord =
+        input.EmissiveTexCoord;
 
     return output;
 }
@@ -289,7 +304,7 @@ float4 PSMain(
     float4 sampledBaseColor =
         BaseColorTexture.Sample(
             TextureSampler,
-            input.TexCoord);
+            input.BaseColorTexCoord);
 
     float3 baseColorLinear =
         SRGBToLinear(
@@ -329,7 +344,7 @@ float4 PSMain(
         SRGBToLinear(
             EmissiveTexture.Sample(
                 TextureSampler,
-                input.TexCoord).rgb);
+                input.EmissiveTexCoord).rgb);
 
     emissiveLinear *=
         EmissiveFactor.rgb;
@@ -370,7 +385,7 @@ float4 PSMain(
     float3 tangentNormal =
         NormalTexture.Sample(
             TextureSampler,
-            input.TexCoord).xyz;
+            input.NormalTexCoord).xyz;
 
     tangentNormal =
         tangentNormal *
@@ -396,7 +411,7 @@ float4 PSMain(
     float4 metallicRoughnessSample =
         MetallicRoughnessTexture.Sample(
             TextureSampler,
-            input.TexCoord);
+            input.MetallicRoughnessTexCoord);
 
     float roughness =
         metallicRoughnessSample.g *
