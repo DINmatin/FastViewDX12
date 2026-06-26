@@ -4,6 +4,14 @@ FastView is a small Windows 3D viewer for **GLB** and **glTF** files. It uses Wi
 
 ![FastViewDX12 preview](docs/images/fastview-preview.png)
 
+## Download
+
+**[Download the latest FastView installer](https://github.com/DINmatin/FastViewDX12/releases/latest/download/FastView_Setup_1.0.1.exe)**
+
+Download the installer, start `FastView_Setup_1.0.1.exe`, and follow the setup instructions.
+
+After installation, GLB files can be opened with FastView and displayed as thumbnails in Windows Explorer.
+
 ## Current features
 
 - Open `.glb` and `.gltf` files from the command line, drag-and-drop, or **Open with**.
@@ -48,7 +56,7 @@ dotnet build .\FastView.slnx -c Release
 Create a self-contained release payload and ZIP:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\build\BuildRelease.ps1 -Version 1.1.0
+powershell -ExecutionPolicy Bypass -File .\build\BuildRelease.ps1 -Version 1.0.1
 ```
 
 Create the Windows installer:

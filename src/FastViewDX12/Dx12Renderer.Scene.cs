@@ -355,9 +355,16 @@ public sealed partial class Dx12Renderer
             mesh.Tangents.Length ==
             mesh.Positions.Length;
 
-        bool texCoordsValid =
+        bool texCoords0Valid =
             mesh.TexCoords0.Length ==
             mesh.Positions.Length;
+
+        bool texCoords1Valid =
+            mesh.TexCoords1.Length ==
+            mesh.Positions.Length;
+
+        MaterialData sourceMaterial =
+            material.Source;
 
         for (int i = 0;
              i < mesh.Positions.Length;
@@ -387,17 +394,47 @@ public sealed partial class Dx12Renderer
                     : CreateFallbackTangent(
                         normal);
 
-            System.Numerics.Vector2 texCoord =
-                texCoordsValid
-                    ? mesh.TexCoords0[i]
-                    : System.Numerics.Vector2.Zero;
+            System.Numerics.Vector2 baseColorTexCoord =
+                ResolveTextureCoordinate(
+                    mesh,
+                    sourceMaterial.BaseColorTextureMapping,
+                    i,
+                    texCoords0Valid,
+                    texCoords1Valid);
+
+            System.Numerics.Vector2 normalTexCoord =
+                ResolveTextureCoordinate(
+                    mesh,
+                    sourceMaterial.NormalTextureMapping,
+                    i,
+                    texCoords0Valid,
+                    texCoords1Valid);
+
+            System.Numerics.Vector2 metallicRoughnessTexCoord =
+                ResolveTextureCoordinate(
+                    mesh,
+                    sourceMaterial.MetallicRoughnessTextureMapping,
+                    i,
+                    texCoords0Valid,
+                    texCoords1Valid);
+
+            System.Numerics.Vector2 emissiveTexCoord =
+                ResolveTextureCoordinate(
+                    mesh,
+                    sourceMaterial.EmissiveTextureMapping,
+                    i,
+                    texCoords0Valid,
+                    texCoords1Valid);
 
             vertices[i] =
                 new VertexPositionNormalTangentTexture(
                     mesh.Positions[i],
                     normal,
                     tangent,
-                    texCoord);
+                    baseColorTexCoord,
+                    normalTexCoord,
+                    metallicRoughnessTexCoord,
+                    emissiveTexCoord);
         }
 
         int vertexStride =
@@ -508,6 +545,34 @@ public sealed partial class Dx12Renderer
             indexCount,
             usesIndexBuffer,
             center);
+    }
+
+    /// <summary>
+    /// Resolves one material channel's UV set and applies its
+    /// KHR_texture_transform matrix before the data reaches the shader.
+    /// </summary>
+    private static System.Numerics.Vector2 ResolveTextureCoordinate(
+        MeshData mesh,
+        TextureMappingData mapping,
+        int vertexIndex,
+        bool texCoords0Valid,
+        bool texCoords1Valid)
+    {
+        if (mapping.TextureCoordinate == 0 &&
+            texCoords0Valid)
+        {
+            return mapping.Apply(
+                mesh.TexCoords0[vertexIndex]);
+        }
+
+        if (mapping.TextureCoordinate == 1 &&
+            texCoords1Valid)
+        {
+            return mapping.Apply(
+                mesh.TexCoords1[vertexIndex]);
+        }
+
+        return System.Numerics.Vector2.Zero;
     }
 
     private static System.Numerics.Vector4 CreateFallbackTangent(
@@ -668,6 +733,16 @@ public sealed partial class Dx12Renderer
         MaterialData material,
         DecodedTexture baseColorTexture)
     {
+        // KHR_materials_transmission keeps alphaMode independent from optical
+        // transmission. Queue transmissive surfaces after opaque geometry so
+        // the current raster renderer can blend the already-rendered scene
+        // through the thin surface.
+        if (material.TransmissionFactor >
+            0.001f)
+        {
+            return MeshAlphaMode.Blend;
+        }
+
         if (material.AlphaMode ==
             MeshAlphaMode.Opaque)
         {

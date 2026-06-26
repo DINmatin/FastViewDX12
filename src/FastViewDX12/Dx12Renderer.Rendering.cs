@@ -29,6 +29,8 @@ public sealed partial class Dx12Renderer
             !_pipelineReady ||
             _opaquePipelineState == null ||
             _blendPipelineState == null ||
+            _opaqueSingleSidedPipelineState == null ||
+            _blendSingleSidedPipelineState == null ||
             _rootSignature == null)
         {
             return;
@@ -142,9 +144,14 @@ public sealed partial class Dx12Renderer
         foreach (GpuRenderItem item in
                  _opaqueItems)
         {
+            ID3D12PipelineState pipelineState =
+                item.Material.Source.DoubleSided
+                    ? _opaquePipelineState
+                    : _opaqueSingleSidedPipelineState;
+
             DrawRenderItem(
                 item,
-                _opaquePipelineState);
+                pipelineState);
         }
 
         System.Numerics.Vector3 cameraPosition =
@@ -170,9 +177,14 @@ public sealed partial class Dx12Renderer
         foreach (GpuRenderItem item in
                  _blendItems)
         {
+            ID3D12PipelineState pipelineState =
+                item.Material.Source.DoubleSided
+                    ? _blendPipelineState
+                    : _blendSingleSidedPipelineState;
+
             DrawRenderItem(
                 item,
-                _blendPipelineState);
+                pipelineState);
         }
 
         PreviewCaptureRequest? previewRequest =
@@ -434,8 +446,25 @@ public sealed partial class Dx12Renderer
                             ? 1.0f
                             : 0.0f,
 
-                        0.0f,
-                        0.0f)
+                        material.DoubleSided
+                            ? 1.0f
+                            : 0.0f,
+
+                        material.TransmissionFactor),
+
+                TextureSamplerIndices =
+                    new System.Numerics.Vector4(
+                        material.BaseColorTextureMapping
+                            .GetSamplerIndex(),
+
+                        material.NormalTextureMapping
+                            .GetSamplerIndex(),
+
+                        material.MetallicRoughnessTextureMapping
+                            .GetSamplerIndex(),
+
+                        material.EmissiveTextureMapping
+                            .GetSamplerIndex())
             };
 
         item.ConstantBuffer.SetData(

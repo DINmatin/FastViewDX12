@@ -4,7 +4,7 @@ cbuffer SceneBuffer : register(b0)
 
     float4 CameraPosition;
     float4 LightDirection;
-        // x = Environment rotation in radians
+    // x = Environment rotation in radians
     // y = Environment intensity
     // z = Direct light intensity
     // w = highest environment mip level
@@ -20,7 +20,13 @@ cbuffer SceneBuffer : register(b0)
 
     // x = AlphaMode: 0 Opaque, 1 Mask, 2 Blend
     // y = Unlit: 0 false, 1 true
+    // z = DoubleSided: 0 false, 1 true
+    // w = KHR_materials_transmission factor
     float4 MaterialFlags;
+
+    // Packed sampler addressing pairs for BaseColor, Normal,
+    // MetallicRoughness, and Emissive textures.
+    float4 TextureSamplerIndices;
 };
 
 Texture2D BaseColorTexture : register(t0);
@@ -36,7 +42,10 @@ struct VSInput
     float3 Position : POSITION;
     float3 Normal : NORMAL;
     float4 Tangent : TANGENT;
-    float2 TexCoord : TEXCOORD;
+    float2 BaseColorTexCoord : TEXCOORD0;
+    float2 NormalTexCoord : TEXCOORD1;
+    float2 MetallicRoughnessTexCoord : TEXCOORD2;
+    float2 EmissiveTexCoord : TEXCOORD3;
 };
 
 struct VSOutput
@@ -46,11 +55,185 @@ struct VSOutput
     float3 WorldPosition : TEXCOORD0;
     float3 Normal : TEXCOORD1;
     float4 Tangent : TEXCOORD2;
-    float2 TexCoord : TEXCOORD3;
+    float2 BaseColorTexCoord : TEXCOORD3;
+    float2 NormalTexCoord : TEXCOORD4;
+    float2 MetallicRoughnessTexCoord : TEXCOORD5;
+    float2 EmissiveTexCoord : TEXCOORD6;
 };
 
 static const float PI =
     3.14159265359f;
+
+static const int TEXTURE_WRAP_REPEAT = 0;
+static const int TEXTURE_WRAP_CLAMP_TO_EDGE = 1;
+static const int TEXTURE_WRAP_MIRRORED_REPEAT = 2;
+
+float MirrorTextureCoordinate(
+    float coordinate)
+{
+    return 1.0f -
+        abs(
+            frac(
+                coordinate *
+                0.5f) *
+            2.0f -
+            1.0f);
+}
+
+float ApplyTextureWrapMode(
+    float coordinate,
+    int wrapMode,
+    float halfTexel)
+{
+    if (wrapMode ==
+        TEXTURE_WRAP_CLAMP_TO_EDGE)
+    {
+        return clamp(
+            coordinate,
+            halfTexel,
+            1.0f - halfTexel);
+    }
+
+    if (wrapMode ==
+        TEXTURE_WRAP_MIRRORED_REPEAT)
+    {
+        return clamp(
+            MirrorTextureCoordinate(
+                coordinate),
+            halfTexel,
+            1.0f - halfTexel);
+    }
+
+    return coordinate;
+}
+
+float2 ApplyTextureWrapModes(
+    float2 textureCoordinate,
+    int samplerIndex,
+    uint textureWidth,
+    uint textureHeight)
+{
+    int wrapS =
+        samplerIndex % 3;
+
+    int wrapT =
+        samplerIndex / 3;
+
+    float2 halfTexel =
+        0.5f /
+        max(
+            float2(
+                textureWidth,
+                textureHeight),
+            1.0f);
+
+    return float2(
+        ApplyTextureWrapMode(
+            textureCoordinate.x,
+            wrapS,
+            halfTexel.x),
+
+        ApplyTextureWrapMode(
+            textureCoordinate.y,
+            wrapT,
+            halfTexel.y));
+}
+
+float4 SampleBaseColorTexture(
+    float2 textureCoordinate)
+{
+    uint width;
+    uint height;
+
+    BaseColorTexture.GetDimensions(
+        width,
+        height);
+
+    int samplerIndex =
+        (int)(
+            TextureSamplerIndices.x +
+            0.5f);
+
+    return BaseColorTexture.Sample(
+        TextureSampler,
+        ApplyTextureWrapModes(
+            textureCoordinate,
+            samplerIndex,
+            width,
+            height));
+}
+
+float4 SampleNormalTexture(
+    float2 textureCoordinate)
+{
+    uint width;
+    uint height;
+
+    NormalTexture.GetDimensions(
+        width,
+        height);
+
+    int samplerIndex =
+        (int)(
+            TextureSamplerIndices.y +
+            0.5f);
+
+    return NormalTexture.Sample(
+        TextureSampler,
+        ApplyTextureWrapModes(
+            textureCoordinate,
+            samplerIndex,
+            width,
+            height));
+}
+
+float4 SampleMetallicRoughnessTexture(
+    float2 textureCoordinate)
+{
+    uint width;
+    uint height;
+
+    MetallicRoughnessTexture.GetDimensions(
+        width,
+        height);
+
+    int samplerIndex =
+        (int)(
+            TextureSamplerIndices.z +
+            0.5f);
+
+    return MetallicRoughnessTexture.Sample(
+        TextureSampler,
+        ApplyTextureWrapModes(
+            textureCoordinate,
+            samplerIndex,
+            width,
+            height));
+}
+
+float4 SampleEmissiveTexture(
+    float2 textureCoordinate)
+{
+    uint width;
+    uint height;
+
+    EmissiveTexture.GetDimensions(
+        width,
+        height);
+
+    int samplerIndex =
+        (int)(
+            TextureSamplerIndices.w +
+            0.5f);
+
+    return EmissiveTexture.Sample(
+        TextureSampler,
+        ApplyTextureWrapModes(
+            textureCoordinate,
+            samplerIndex,
+            width,
+            height));
+}
 
 float3 RotateDirectionAroundY(
     float3 direction,
@@ -277,19 +460,28 @@ VSOutput VSMain(
     output.Tangent =
         input.Tangent;
 
-    output.TexCoord =
-        input.TexCoord;
+    output.BaseColorTexCoord =
+        input.BaseColorTexCoord;
+
+    output.NormalTexCoord =
+        input.NormalTexCoord;
+
+    output.MetallicRoughnessTexCoord =
+        input.MetallicRoughnessTexCoord;
+
+    output.EmissiveTexCoord =
+        input.EmissiveTexCoord;
 
     return output;
 }
 
 float4 PSMain(
-    VSOutput input) : SV_Target
+    VSOutput input,
+    bool isFrontFace : SV_IsFrontFace) : SV_Target
 {
     float4 sampledBaseColor =
-        BaseColorTexture.Sample(
-            TextureSampler,
-            input.TexCoord);
+        SampleBaseColorTexture(
+            input.BaseColorTexCoord);
 
     float3 baseColorLinear =
         SRGBToLinear(
@@ -327,9 +519,8 @@ float4 PSMain(
 
     float3 emissiveLinear =
         SRGBToLinear(
-            EmissiveTexture.Sample(
-                TextureSampler,
-                input.TexCoord).rgb);
+            SampleEmissiveTexture(
+                input.EmissiveTexCoord).rgb);
 
     emissiveLinear *=
         EmissiveFactor.rgb;
@@ -346,6 +537,16 @@ float4 PSMain(
     float3 geometryNormal =
         normalize(
             input.Normal);
+
+    // glTF requires the normal of a visible back face to be reversed for
+    // lighting when doubleSided is enabled. Single-sided back faces never
+    // reach this shader because the rasterizer culls them.
+    if (MaterialFlags.z > 0.5f &&
+        !isFrontFace)
+    {
+        geometryNormal =
+            -geometryNormal;
+    }
 
     float3 tangent =
         input.Tangent.xyz;
@@ -368,9 +569,8 @@ float4 PSMain(
             input.Tangent.w);
 
     float3 tangentNormal =
-        NormalTexture.Sample(
-            TextureSampler,
-            input.TexCoord).xyz;
+        SampleNormalTexture(
+            input.NormalTexCoord).xyz;
 
     tangentNormal =
         tangentNormal *
@@ -394,9 +594,8 @@ float4 PSMain(
             tangentNormal.z);
 
     float4 metallicRoughnessSample =
-        MetallicRoughnessTexture.Sample(
-            TextureSampler,
-            input.TexCoord);
+        SampleMetallicRoughnessTexture(
+            input.MetallicRoughnessTexCoord);
 
     float roughness =
         metallicRoughnessSample.g *
@@ -510,11 +709,21 @@ float4 PSMain(
     3.0f *
     EnvironmentSettings.z;
 
-    float3 directLighting =
-        (diffuse + specular) *
+    float3 directDiffuseLighting =
+        diffuse *
         sunColor *
         sunIntensity *
         normalLight;
+
+    float3 directSpecularLighting =
+        specular *
+        sunColor *
+        sunIntensity *
+        normalLight;
+
+    float3 directLighting =
+        directDiffuseLighting +
+        directSpecularLighting;
 
     float upwardFactor =
         saturate(
@@ -596,6 +805,66 @@ float4 PSMain(
         ambientDiffuse +
         ambientSpecular +
         emissiveLinear;
+
+    float transmission =
+        saturate(
+            MaterialFlags.w);
+
+    if (transmission >
+        0.001f)
+    {
+        // FastView currently renders transmission as a thin surface without
+        // refraction or volume absorption. Keep only the reflected lighting
+        // for the transmissive part and let the already-rendered opaque scene
+        // show through according to the dielectric Fresnel term.
+        float dielectricReflectance =
+            FresnelSchlick(
+                normalView,
+                float3(
+                    0.04f,
+                    0.04f,
+                    0.04f)).r;
+
+        float transmittedWeight =
+            transmission *
+            (1.0f - dielectricReflectance);
+
+        float transmissionAlpha =
+            saturate(
+                1.0f - transmittedWeight);
+
+        float3 opaqueEncoded =
+            ToneMapAndEncode(
+                finalColor);
+
+        float3 reflectedEncoded =
+            ToneMapAndEncode(
+                directSpecularLighting +
+                ambientSpecular +
+                emissiveLinear);
+
+        float3 premultipliedSource =
+            lerp(
+                opaqueEncoded,
+                reflectedEncoded,
+                transmission);
+
+        float outputAlpha =
+            saturate(
+                alpha *
+                transmissionAlpha);
+
+        float3 sourceColor =
+            premultipliedSource /
+            max(
+                outputAlpha,
+                0.001f);
+
+        return float4(
+            saturate(
+                sourceColor),
+            outputAlpha);
+    }
 
     return float4(
         ToneMapAndEncode(

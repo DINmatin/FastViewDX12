@@ -3,7 +3,7 @@ setlocal EnableExtensions
 
 set "SCRIPT_DIR=%~dp0"
 set "REPO_ROOT=%SCRIPT_DIR%.."
-set "VERSION=1.1.0"
+set "VERSION=1.0.1"
 set "PAYLOAD_DIR=%SCRIPT_DIR%Payload"
 set "RELEASE_DIR=%REPO_ROOT%\artifacts\FastView-%VERSION%-win-x64"
 set "ISS_FILE=%SCRIPT_DIR%FastView.iss"

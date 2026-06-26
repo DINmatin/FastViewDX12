@@ -104,9 +104,15 @@ public sealed partial class Dx12Renderer : IDisposable
 
     private ID3D12RootSignature? _rootSignature;
 
+    // Double-sided materials keep the historical no-cull pipeline.
     private ID3D12PipelineState? _opaquePipelineState;
 
     private ID3D12PipelineState? _blendPipelineState;
+
+    // Single-sided glTF materials use dedicated back-face-culling pipelines.
+    private ID3D12PipelineState? _opaqueSingleSidedPipelineState;
+
+    private ID3D12PipelineState? _blendSingleSidedPipelineState;
 
     private ID3D12RootSignature? _backgroundRootSignature;
 
@@ -148,18 +154,27 @@ public sealed partial class Dx12Renderer : IDisposable
         public System.Numerics.Vector3 Position;
         public System.Numerics.Vector3 Normal;
         public System.Numerics.Vector4 Tangent;
-        public System.Numerics.Vector2 TexCoord;
+        public System.Numerics.Vector2 BaseColorTexCoord;
+        public System.Numerics.Vector2 NormalTexCoord;
+        public System.Numerics.Vector2 MetallicRoughnessTexCoord;
+        public System.Numerics.Vector2 EmissiveTexCoord;
 
         public VertexPositionNormalTangentTexture(
             System.Numerics.Vector3 position,
             System.Numerics.Vector3 normal,
             System.Numerics.Vector4 tangent,
-            System.Numerics.Vector2 texCoord)
+            System.Numerics.Vector2 baseColorTexCoord,
+            System.Numerics.Vector2 normalTexCoord,
+            System.Numerics.Vector2 metallicRoughnessTexCoord,
+            System.Numerics.Vector2 emissiveTexCoord)
         {
             Position = position;
             Normal = normal;
             Tangent = tangent;
-            TexCoord = texCoord;
+            BaseColorTexCoord = baseColorTexCoord;
+            NormalTexCoord = normalTexCoord;
+            MetallicRoughnessTexCoord = metallicRoughnessTexCoord;
+            EmissiveTexCoord = emissiveTexCoord;
         }
     }
 
@@ -188,6 +203,12 @@ public sealed partial class Dx12Renderer : IDisposable
         public System.Numerics.Vector4 MaterialFactors;
 
         public System.Numerics.Vector4 MaterialFlags;
+
+        // x = BaseColor sampler index
+        // y = Normal sampler index
+        // z = MetallicRoughness sampler index
+        // w = Emissive sampler index
+        public System.Numerics.Vector4 TextureSamplerIndices;
     }
 
     [System.Runtime.InteropServices.StructLayout(
@@ -235,6 +256,8 @@ public sealed partial class Dx12Renderer : IDisposable
         _backgroundPipelineState?.Dispose();
         _backgroundRootSignature?.Dispose();
 
+        _blendSingleSidedPipelineState?.Dispose();
+        _opaqueSingleSidedPipelineState?.Dispose();
         _blendPipelineState?.Dispose();
         _opaquePipelineState?.Dispose();
         _rootSignature?.Dispose();
@@ -272,6 +295,12 @@ public sealed partial class Dx12Renderer : IDisposable
             null;
 
         _backgroundRootSignature =
+            null;
+
+        _blendSingleSidedPipelineState =
+            null;
+
+        _opaqueSingleSidedPipelineState =
             null;
 
         _blendPipelineState =
