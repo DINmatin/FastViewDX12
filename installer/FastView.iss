@@ -1,6 +1,6 @@
 #define MyAppName "FastView"
 #ifndef MyAppVersion
-  #define MyAppVersion "1.1.0"
+  #define MyAppVersion "1.0.1"
 #endif
 #define MyAppExeName "FastViewDX12.exe"
 #define MyProviderComHost "FastView.ThumbnailProvider.comhost.dll"
