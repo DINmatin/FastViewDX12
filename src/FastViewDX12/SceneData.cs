@@ -134,6 +134,12 @@ public sealed class MaterialData
     /// <summary>Gets or sets the roughness factor defined by the glTF material.</summary>
     public float RoughnessFactor { get; set; } = 1.0f;
 
+    /// <summary>
+    /// Gets or sets the thin-surface transmission factor from
+    /// KHR_materials_transmission. Zero is opaque and one is fully transmissive.
+    /// </summary>
+    public float TransmissionFactor { get; set; }
+
     /// <summary>Gets or sets the tangent-space normal-map strength.</summary>
     public float NormalScale { get; set; } = 1.0f;
 

@@ -733,6 +733,16 @@ public sealed partial class Dx12Renderer
         MaterialData material,
         DecodedTexture baseColorTexture)
     {
+        // KHR_materials_transmission keeps alphaMode independent from optical
+        // transmission. Queue transmissive surfaces after opaque geometry so
+        // the current raster renderer can blend the already-rendered scene
+        // through the thin surface.
+        if (material.TransmissionFactor >
+            0.001f)
+        {
+            return MeshAlphaMode.Blend;
+        }
+
         if (material.AlphaMode ==
             MeshAlphaMode.Opaque)
         {

@@ -21,6 +21,7 @@ cbuffer SceneBuffer : register(b0)
     // x = AlphaMode: 0 Opaque, 1 Mask, 2 Blend
     // y = Unlit: 0 false, 1 true
     // z = DoubleSided: 0 false, 1 true
+    // w = KHR_materials_transmission factor
     float4 MaterialFlags;
 
     // Packed sampler addressing pairs for BaseColor, Normal,
@@ -708,11 +709,21 @@ float4 PSMain(
     3.0f *
     EnvironmentSettings.z;
 
-    float3 directLighting =
-        (diffuse + specular) *
+    float3 directDiffuseLighting =
+        diffuse *
         sunColor *
         sunIntensity *
         normalLight;
+
+    float3 directSpecularLighting =
+        specular *
+        sunColor *
+        sunIntensity *
+        normalLight;
+
+    float3 directLighting =
+        directDiffuseLighting +
+        directSpecularLighting;
 
     float upwardFactor =
         saturate(
@@ -794,6 +805,66 @@ float4 PSMain(
         ambientDiffuse +
         ambientSpecular +
         emissiveLinear;
+
+    float transmission =
+        saturate(
+            MaterialFlags.w);
+
+    if (transmission >
+        0.001f)
+    {
+        // FastView currently renders transmission as a thin surface without
+        // refraction or volume absorption. Keep only the reflected lighting
+        // for the transmissive part and let the already-rendered opaque scene
+        // show through according to the dielectric Fresnel term.
+        float dielectricReflectance =
+            FresnelSchlick(
+                normalView,
+                float3(
+                    0.04f,
+                    0.04f,
+                    0.04f)).r;
+
+        float transmittedWeight =
+            transmission *
+            (1.0f - dielectricReflectance);
+
+        float transmissionAlpha =
+            saturate(
+                1.0f - transmittedWeight);
+
+        float3 opaqueEncoded =
+            ToneMapAndEncode(
+                finalColor);
+
+        float3 reflectedEncoded =
+            ToneMapAndEncode(
+                directSpecularLighting +
+                ambientSpecular +
+                emissiveLinear);
+
+        float3 premultipliedSource =
+            lerp(
+                opaqueEncoded,
+                reflectedEncoded,
+                transmission);
+
+        float outputAlpha =
+            saturate(
+                alpha *
+                transmissionAlpha);
+
+        float3 sourceColor =
+            premultipliedSource /
+            max(
+                outputAlpha,
+                0.001f);
+
+        return float4(
+            saturate(
+                sourceColor),
+            outputAlpha);
+    }
 
     return float4(
         ToneMapAndEncode(

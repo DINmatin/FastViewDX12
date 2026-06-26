@@ -450,7 +450,7 @@ public sealed partial class Dx12Renderer
                             ? 1.0f
                             : 0.0f,
 
-                        0.0f),
+                        material.TransmissionFactor),
 
                 TextureSamplerIndices =
                     new System.Numerics.Vector4(

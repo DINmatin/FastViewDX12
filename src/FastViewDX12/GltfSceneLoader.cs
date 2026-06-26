@@ -378,6 +378,22 @@ public static class GltfSceneLoader
                     result.MetallicRoughnessTextureMapping);
         }
 
+        MaterialChannel? transmissionChannel =
+            material.FindChannel(
+                "Transmission");
+
+        if (transmissionChannel.HasValue)
+        {
+            result.TransmissionFactor =
+                Math.Clamp(
+                    GetFactorOrDefault(
+                        transmissionChannel.Value,
+                        "TransmissionFactor",
+                        0.0f),
+                    0.0f,
+                    1.0f);
+        }
+
         MaterialChannel? emissiveChannel =
             material.FindChannel(
                 "Emissive");
@@ -400,6 +416,7 @@ public static class GltfSceneLoader
             $"baseColor={result.BaseColorTextureBytes?.Length ?? 0} bytes, " +
             $"normal={result.NormalTextureBytes?.Length ?? 0} bytes, " +
             $"metallicRoughness={result.MetallicRoughnessTextureBytes?.Length ?? 0} bytes, " +
+            $"transmission={result.TransmissionFactor:0.###}, " +
             $"emissive={result.EmissiveTextureBytes?.Length ?? 0} bytes");
 
         return result;
