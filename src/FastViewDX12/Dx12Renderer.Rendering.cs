@@ -435,7 +435,21 @@ public sealed partial class Dx12Renderer
                             : 0.0f,
 
                         0.0f,
-                        0.0f)
+                        0.0f),
+
+                TextureSamplerIndices =
+                    new System.Numerics.Vector4(
+                        material.BaseColorTextureMapping
+                            .GetSamplerIndex(),
+
+                        material.NormalTextureMapping
+                            .GetSamplerIndex(),
+
+                        material.MetallicRoughnessTextureMapping
+                            .GetSamplerIndex(),
+
+                        material.EmissiveTextureMapping
+                            .GetSamplerIndex())
             };
 
         item.ConstantBuffer.SetData(

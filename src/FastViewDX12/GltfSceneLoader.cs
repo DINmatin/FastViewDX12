@@ -920,6 +920,23 @@ public static class GltfSceneLoader
             return null;
         }
 
+        TextureSampler? sampler =
+            texture.Sampler;
+
+        mapping.WrapS =
+            ConvertTextureWrapMode(
+                sampler?.WrapS ??
+                TextureWrapMode.REPEAT);
+
+        mapping.WrapT =
+            ConvertTextureWrapMode(
+                sampler?.WrapT ??
+                TextureWrapMode.REPEAT);
+
+        Debug.WriteLine(
+            $"{channelName}: wrapS={mapping.WrapS}, " +
+            $"wrapT={mapping.WrapT}.");
+
         SharpGLTF.Schema2.Image? image =
             SelectSupportedImage(
                 texture);
@@ -941,6 +958,25 @@ public static class GltfSceneLoader
         }
 
         return content.Content.ToArray();
+    }
+
+    /// <summary>
+    /// Converts SharpGLTF's glTF sampler enum into the renderer-neutral mode.
+    /// </summary>
+    private static TextureWrapModeData ConvertTextureWrapMode(
+        TextureWrapMode wrapMode)
+    {
+        return wrapMode switch
+        {
+            TextureWrapMode.CLAMP_TO_EDGE =>
+                TextureWrapModeData.ClampToEdge,
+
+            TextureWrapMode.MIRRORED_REPEAT =>
+                TextureWrapModeData.MirroredRepeat,
+
+            _ =>
+                TextureWrapModeData.Repeat
+        };
     }
 
     /// <summary>

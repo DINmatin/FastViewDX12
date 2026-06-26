@@ -32,8 +32,25 @@ public sealed class SceneData
 }
 
 /// <summary>
-/// Describes which glTF texture-coordinate set a material channel uses and
-/// the optional KHR_texture_transform matrix applied before sampling.
+/// Texture addressing modes supported by the glTF 2.0 sampler model.
+/// The numeric values are intentionally compact because one S/T pair is
+/// packed into a single shader constant.
+/// </summary>
+public enum TextureWrapModeData
+{
+    /// <summary>Tiles the texture for coordinates outside the zero-to-one range.</summary>
+    Repeat = 0,
+
+    /// <summary>Extends the nearest edge texel beyond the zero-to-one range.</summary>
+    ClampToEdge = 1,
+
+    /// <summary>Tiles the texture while mirroring every second repetition.</summary>
+    MirroredRepeat = 2
+}
+
+/// <summary>
+/// Describes which glTF texture-coordinate set a material channel uses,
+/// its optional KHR_texture_transform matrix, and its sampler addressing modes.
 /// </summary>
 public sealed class TextureMappingData
 {
@@ -46,6 +63,21 @@ public sealed class TextureMappingData
     /// Gets or sets the affine UV transform. Identity means no transform.
     /// </summary>
     public Matrix3x2 Transform { get; set; } = Matrix3x2.Identity;
+
+    /// <summary>Gets or sets the sampler addressing mode for the U/S axis.</summary>
+    public TextureWrapModeData WrapS { get; set; } = TextureWrapModeData.Repeat;
+
+    /// <summary>Gets or sets the sampler addressing mode for the V/T axis.</summary>
+    public TextureWrapModeData WrapT { get; set; } = TextureWrapModeData.Repeat;
+
+    /// <summary>
+    /// Packs the U and V addressing modes into one value for the shader.
+    /// </summary>
+    public int GetSamplerIndex()
+    {
+        return (int)WrapS +
+               (int)WrapT * 3;
+    }
 
     /// <summary>
     /// Applies the channel's KHR_texture_transform matrix to one UV coordinate.

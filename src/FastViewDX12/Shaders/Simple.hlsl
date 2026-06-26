@@ -21,6 +21,10 @@ cbuffer SceneBuffer : register(b0)
     // x = AlphaMode: 0 Opaque, 1 Mask, 2 Blend
     // y = Unlit: 0 false, 1 true
     float4 MaterialFlags;
+
+    // Packed sampler addressing pairs for BaseColor, Normal,
+    // MetallicRoughness, and Emissive textures.
+    float4 TextureSamplerIndices;
 };
 
 Texture2D BaseColorTexture : register(t0);
@@ -57,6 +61,177 @@ struct VSOutput
 
 static const float PI =
     3.14159265359f;
+
+static const int TEXTURE_WRAP_REPEAT = 0;
+static const int TEXTURE_WRAP_CLAMP_TO_EDGE = 1;
+static const int TEXTURE_WRAP_MIRRORED_REPEAT = 2;
+
+float MirrorTextureCoordinate(
+    float coordinate)
+{
+    return 1.0f -
+        abs(
+            frac(
+                coordinate *
+                0.5f) *
+            2.0f -
+            1.0f);
+}
+
+float ApplyTextureWrapMode(
+    float coordinate,
+    int wrapMode,
+    float halfTexel)
+{
+    if (wrapMode ==
+        TEXTURE_WRAP_CLAMP_TO_EDGE)
+    {
+        return clamp(
+            coordinate,
+            halfTexel,
+            1.0f - halfTexel);
+    }
+
+    if (wrapMode ==
+        TEXTURE_WRAP_MIRRORED_REPEAT)
+    {
+        return clamp(
+            MirrorTextureCoordinate(
+                coordinate),
+            halfTexel,
+            1.0f - halfTexel);
+    }
+
+    return coordinate;
+}
+
+float2 ApplyTextureWrapModes(
+    float2 textureCoordinate,
+    int samplerIndex,
+    uint textureWidth,
+    uint textureHeight)
+{
+    int wrapS =
+        samplerIndex % 3;
+
+    int wrapT =
+        samplerIndex / 3;
+
+    float2 halfTexel =
+        0.5f /
+        max(
+            float2(
+                textureWidth,
+                textureHeight),
+            1.0f);
+
+    return float2(
+        ApplyTextureWrapMode(
+            textureCoordinate.x,
+            wrapS,
+            halfTexel.x),
+
+        ApplyTextureWrapMode(
+            textureCoordinate.y,
+            wrapT,
+            halfTexel.y));
+}
+
+float4 SampleBaseColorTexture(
+    float2 textureCoordinate)
+{
+    uint width;
+    uint height;
+
+    BaseColorTexture.GetDimensions(
+        width,
+        height);
+
+    int samplerIndex =
+        (int)(
+            TextureSamplerIndices.x +
+            0.5f);
+
+    return BaseColorTexture.Sample(
+        TextureSampler,
+        ApplyTextureWrapModes(
+            textureCoordinate,
+            samplerIndex,
+            width,
+            height));
+}
+
+float4 SampleNormalTexture(
+    float2 textureCoordinate)
+{
+    uint width;
+    uint height;
+
+    NormalTexture.GetDimensions(
+        width,
+        height);
+
+    int samplerIndex =
+        (int)(
+            TextureSamplerIndices.y +
+            0.5f);
+
+    return NormalTexture.Sample(
+        TextureSampler,
+        ApplyTextureWrapModes(
+            textureCoordinate,
+            samplerIndex,
+            width,
+            height));
+}
+
+float4 SampleMetallicRoughnessTexture(
+    float2 textureCoordinate)
+{
+    uint width;
+    uint height;
+
+    MetallicRoughnessTexture.GetDimensions(
+        width,
+        height);
+
+    int samplerIndex =
+        (int)(
+            TextureSamplerIndices.z +
+            0.5f);
+
+    return MetallicRoughnessTexture.Sample(
+        TextureSampler,
+        ApplyTextureWrapModes(
+            textureCoordinate,
+            samplerIndex,
+            width,
+            height));
+}
+
+float4 SampleEmissiveTexture(
+    float2 textureCoordinate)
+{
+    uint width;
+    uint height;
+
+    EmissiveTexture.GetDimensions(
+        width,
+        height);
+
+    int samplerIndex =
+        (int)(
+            TextureSamplerIndices.w +
+            0.5f);
+
+    return EmissiveTexture.Sample(
+        TextureSampler,
+        ApplyTextureWrapModes(
+            textureCoordinate,
+            samplerIndex,
+            width,
+            height));
+}
 
 float3 RotateDirectionAroundY(
     float3 direction,
@@ -302,8 +477,7 @@ float4 PSMain(
     VSOutput input) : SV_Target
 {
     float4 sampledBaseColor =
-        BaseColorTexture.Sample(
-            TextureSampler,
+        SampleBaseColorTexture(
             input.BaseColorTexCoord);
 
     float3 baseColorLinear =
@@ -342,8 +516,7 @@ float4 PSMain(
 
     float3 emissiveLinear =
         SRGBToLinear(
-            EmissiveTexture.Sample(
-                TextureSampler,
+            SampleEmissiveTexture(
                 input.EmissiveTexCoord).rgb);
 
     emissiveLinear *=
@@ -383,8 +556,7 @@ float4 PSMain(
             input.Tangent.w);
 
     float3 tangentNormal =
-        NormalTexture.Sample(
-            TextureSampler,
+        SampleNormalTexture(
             input.NormalTexCoord).xyz;
 
     tangentNormal =
@@ -409,8 +581,7 @@ float4 PSMain(
             tangentNormal.z);
 
     float4 metallicRoughnessSample =
-        MetallicRoughnessTexture.Sample(
-            TextureSampler,
+        SampleMetallicRoughnessTexture(
             input.MetallicRoughnessTexCoord);
 
     float roughness =

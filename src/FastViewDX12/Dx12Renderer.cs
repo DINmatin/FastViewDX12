@@ -197,6 +197,12 @@ public sealed partial class Dx12Renderer : IDisposable
         public System.Numerics.Vector4 MaterialFactors;
 
         public System.Numerics.Vector4 MaterialFlags;
+
+        // x = BaseColor sampler index
+        // y = Normal sampler index
+        // z = MetallicRoughness sampler index
+        // w = Emissive sampler index
+        public System.Numerics.Vector4 TextureSamplerIndices;
     }
 
     [System.Runtime.InteropServices.StructLayout(
