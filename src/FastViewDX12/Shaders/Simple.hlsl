@@ -20,6 +20,7 @@ cbuffer SceneBuffer : register(b0)
 
     // x = AlphaMode: 0 Opaque, 1 Mask, 2 Blend
     // y = Unlit: 0 false, 1 true
+    // z = DoubleSided: 0 false, 1 true
     float4 MaterialFlags;
 
     // Packed sampler addressing pairs for BaseColor, Normal,
@@ -474,7 +475,8 @@ VSOutput VSMain(
 }
 
 float4 PSMain(
-    VSOutput input) : SV_Target
+    VSOutput input,
+    bool isFrontFace : SV_IsFrontFace) : SV_Target
 {
     float4 sampledBaseColor =
         SampleBaseColorTexture(
@@ -534,6 +536,16 @@ float4 PSMain(
     float3 geometryNormal =
         normalize(
             input.Normal);
+
+    // glTF requires the normal of a visible back face to be reversed for
+    // lighting when doubleSided is enabled. Single-sided back faces never
+    // reach this shader because the rasterizer culls them.
+    if (MaterialFlags.z > 0.5f &&
+        !isFrontFace)
+    {
+        geometryNormal =
+            -geometryNormal;
+    }
 
     float3 tangent =
         input.Tangent.xyz;

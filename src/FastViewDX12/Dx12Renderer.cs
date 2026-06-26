@@ -104,9 +104,15 @@ public sealed partial class Dx12Renderer : IDisposable
 
     private ID3D12RootSignature? _rootSignature;
 
+    // Double-sided materials keep the historical no-cull pipeline.
     private ID3D12PipelineState? _opaquePipelineState;
 
     private ID3D12PipelineState? _blendPipelineState;
+
+    // Single-sided glTF materials use dedicated back-face-culling pipelines.
+    private ID3D12PipelineState? _opaqueSingleSidedPipelineState;
+
+    private ID3D12PipelineState? _blendSingleSidedPipelineState;
 
     private ID3D12RootSignature? _backgroundRootSignature;
 
@@ -250,6 +256,8 @@ public sealed partial class Dx12Renderer : IDisposable
         _backgroundPipelineState?.Dispose();
         _backgroundRootSignature?.Dispose();
 
+        _blendSingleSidedPipelineState?.Dispose();
+        _opaqueSingleSidedPipelineState?.Dispose();
         _blendPipelineState?.Dispose();
         _opaquePipelineState?.Dispose();
         _rootSignature?.Dispose();
@@ -287,6 +295,12 @@ public sealed partial class Dx12Renderer : IDisposable
             null;
 
         _backgroundRootSignature =
+            null;
+
+        _blendSingleSidedPipelineState =
+            null;
+
+        _opaqueSingleSidedPipelineState =
             null;
 
         _blendPipelineState =

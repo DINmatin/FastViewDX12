@@ -255,17 +255,45 @@ public sealed partial class Dx12Renderer
                 0)
         ];
 
+        RasterizerDescription doubleSidedRasterizer =
+            RasterizerDescription.CullNone;
+
+        RasterizerDescription singleSidedRasterizer =
+            RasterizerDescription.CullNone;
+
+        // glTF defines counter-clockwise triangles as front-facing.
+        // Match that convention before enabling back-face culling.
+        singleSidedRasterizer.FrontCounterClockwise =
+            true;
+
+        singleSidedRasterizer.CullMode =
+            CullMode.Back;
+
         GraphicsPipelineStateDescription opaqueDescription =
             CreatePipelineDescription(
                 vertexShader,
                 pixelShader,
                 inputElements,
                 BlendDescription.Opaque,
-                DepthStencilDescription.Default);
+                DepthStencilDescription.Default,
+                doubleSidedRasterizer);
 
         _opaquePipelineState =
             _device.CreateGraphicsPipelineState(
                 opaqueDescription);
+
+        GraphicsPipelineStateDescription opaqueSingleSidedDescription =
+            CreatePipelineDescription(
+                vertexShader,
+                pixelShader,
+                inputElements,
+                BlendDescription.Opaque,
+                DepthStencilDescription.Default,
+                singleSidedRasterizer);
+
+        _opaqueSingleSidedPipelineState =
+            _device.CreateGraphicsPipelineState(
+                opaqueSingleSidedDescription);
 
         GraphicsPipelineStateDescription blendDescription =
             CreatePipelineDescription(
@@ -273,11 +301,25 @@ public sealed partial class Dx12Renderer
                 pixelShader,
                 inputElements,
                 BlendDescription.NonPremultiplied,
-                DepthStencilDescription.Read);
+                DepthStencilDescription.Read,
+                doubleSidedRasterizer);
 
         _blendPipelineState =
             _device.CreateGraphicsPipelineState(
                 blendDescription);
+
+        GraphicsPipelineStateDescription blendSingleSidedDescription =
+            CreatePipelineDescription(
+                vertexShader,
+                pixelShader,
+                inputElements,
+                BlendDescription.NonPremultiplied,
+                DepthStencilDescription.Read,
+                singleSidedRasterizer);
+
+        _blendSingleSidedPipelineState =
+            _device.CreateGraphicsPipelineState(
+                blendSingleSidedDescription);
 
         _pipelineReady =
             true;
@@ -291,7 +333,8 @@ public sealed partial class Dx12Renderer
         byte[] pixelShader,
         InputElementDescription[] inputElements,
         BlendDescription blendState,
-        DepthStencilDescription depthStencilState)
+        DepthStencilDescription depthStencilState,
+        RasterizerDescription rasterizerState)
     {
         if (_rootSignature == null)
         {
@@ -314,7 +357,7 @@ public sealed partial class Dx12Renderer
                 blendState,
 
             RasterizerState =
-                RasterizerDescription.CullNone,
+                rasterizerState,
 
             DepthStencilState =
                 depthStencilState,
