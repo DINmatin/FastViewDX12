@@ -318,19 +318,53 @@ public sealed partial class MainForm
     }
 
     /// <summary>
-    /// F frames the selected model. Without a selection it frames the complete scene.
+    /// W, E, and R select Move, Rotate, and Scale. F frames the selected model,
+    /// or the complete scene when no model is selected.
     /// </summary>
     private void MainForm_KeyDown(
         object? sender,
         KeyEventArgs e)
     {
-        if (e.KeyCode !=
-            Keys.F)
+        if (e.Control ||
+            e.Alt)
         {
             return;
         }
 
-        FocusSelectedModelOrScene();
+        bool handled =
+            true;
+
+        switch (e.KeyCode)
+        {
+            case Keys.W:
+                SetTransformGizmoMode(
+                    TransformGizmoMode.Move);
+                break;
+
+            case Keys.E:
+                SetTransformGizmoMode(
+                    TransformGizmoMode.Rotate);
+                break;
+
+            case Keys.R:
+                SetTransformGizmoMode(
+                    TransformGizmoMode.Scale);
+                break;
+
+            case Keys.F:
+                FocusSelectedModelOrScene();
+                break;
+
+            default:
+                handled =
+                    false;
+                break;
+        }
+
+        if (!handled)
+        {
+            return;
+        }
 
         e.Handled =
             true;
