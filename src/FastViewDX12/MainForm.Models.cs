@@ -145,10 +145,12 @@ public sealed partial class MainForm
     /// <summary>
     /// Rebuilds the flattened renderer scene after the document model list changes.
     /// </summary>
-    private void RebuildRenderedScene()
+    private void RebuildRenderedScene(
+        bool fitCamera = true)
     {
         _renderer.LoadScene(
-            _sceneDocument.BuildRenderScene());
+            _sceneDocument.BuildRenderScene(),
+            fitCamera);
     }
 
     /// <summary>

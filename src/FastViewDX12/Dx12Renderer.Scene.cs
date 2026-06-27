@@ -625,8 +625,10 @@ public sealed partial class Dx12Renderer
     /// Replaces the current GPU scene with meshes and materials loaded from a glTF document.
     /// </summary>
     /// <param name="scene">CPU-side scene data to upload.</param>
+    /// <param name="fitCamera">Whether the camera should be reframed around the new scene bounds.</param>
     public void LoadScene(
-        SceneData scene)
+        SceneData scene,
+        bool fitCamera = true)
     {
         ArgumentNullException.ThrowIfNull(
             scene);
@@ -715,8 +717,11 @@ public sealed partial class Dx12Renderer
                 $"resolvedAlpha={mesh.ResolvedAlphaMode}");
         }
 
-        _camera.FitToScene(
-            _scene);
+        if (fitCamera)
+        {
+            _camera.FitToScene(
+                _scene);
+        }
 
         Debug.WriteLine(
             $"Renderer scene ready: " +
