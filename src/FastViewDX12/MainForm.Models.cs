@@ -1,35 +1,164 @@
 using System;
 using System.Diagnostics;
-using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
 
 namespace FastViewDX12;
 
-// Model-path validation, loading, camera fitting, and last-file persistence.
+// Model-path validation, scene replacement, additional loading, and last-file persistence.
 public sealed partial class MainForm
 {
     /// <summary>
-    /// Validates and loads a GLB or glTF file, updates the camera, and persists the path for the next launch.
+    /// Validates and loads a GLB or glTF file as the only model in the scene.
     /// </summary>
     /// <param name="path">Model path selected by the user, drag-and-drop, or startup recovery.</param>
-    private void LoadModelFromPath(string path, bool rememberAsLast = true)
+    /// <param name="rememberAsLast">Whether the path becomes the next startup model.</param>
+    private void LoadModelFromPath(
+        string path,
+        bool rememberAsLast = true)
     {
-        if (string.IsNullOrWhiteSpace(path)) return;
-        if (!File.Exists(path)) return;
-        string ext = Path.GetExtension(path).ToLowerInvariant();
-        if (ext != ".glb" && ext != ".gltf") return;
+        LoadModelFromPath(
+            path,
+            addToScene: false,
+            rememberAsLast: rememberAsLast);
+    }
+
+    /// <summary>
+    /// Validates and appends a GLB or glTF file without removing existing models.
+    /// </summary>
+    private void AddModelFromPath(
+        string path)
+    {
+        LoadModelFromPath(
+            path,
+            addToScene: true,
+            rememberAsLast: false);
+    }
+
+    /// <summary>
+    /// Opens a file dialog for either replacing the scene or appending one model.
+    /// </summary>
+    private void ChooseModelFile(
+        bool addToScene)
+    {
+        using var dialog =
+            new OpenFileDialog
+            {
+                Title =
+                    addToScene
+                        ? "Add model to scene"
+                        : "Open model",
+
+                Filter =
+                    "glTF models (*.glb;*.gltf)|*.glb;*.gltf|" +
+                    "GLB files (*.glb)|*.glb|" +
+                    "glTF files (*.gltf)|*.gltf",
+
+                CheckFileExists =
+                    true,
+
+                Multiselect =
+                    false,
+
+                RestoreDirectory =
+                    true
+            };
+
+        if (dialog.ShowDialog(this) !=
+            DialogResult.OK)
+        {
+            return;
+        }
+
+        if (addToScene)
+        {
+            AddModelFromPath(
+                dialog.FileName);
+        }
+        else
+        {
+            LoadModelFromPath(
+                dialog.FileName,
+                true);
+        }
+    }
+
+    private void LoadModelFromPath(
+        string path,
+        bool addToScene,
+        bool rememberAsLast)
+    {
+        if (!IsSupportedModelPath(path))
+        {
+            return;
+        }
+
         try
         {
-            SceneData scene = GltfSceneLoader.LoadFromFile(path);
-            _renderer.LoadScene(scene); Text = $"FastViewDX12 - {Path.GetFileName(path)}";
+            SceneData loadedScene =
+                GltfSceneLoader.LoadFromFile(
+                    path);
+
+            if (addToScene)
+            {
+                _sceneDocument.Add(
+                    path,
+                    loadedScene);
+            }
+            else
+            {
+                _sceneDocument.ReplaceWith(
+                    path,
+                    loadedScene);
+            }
+
+            _renderer.LoadScene(
+                _sceneDocument.BuildRenderScene());
+
+            UpdateWindowTitle();
+
             if (rememberAsLast)
             {
-                Directory.CreateDirectory(_stateFolder);
-                File.WriteAllText(LastModelPathFile, path);
+                Directory.CreateDirectory(
+                    _stateFolder);
+
+                File.WriteAllText(
+                    LastModelPathFile,
+                    path);
             }
         }
-        catch (Exception ex) { Debug.WriteLine($"LoadModelFromPath failed: {ex}"); }
+        catch (Exception ex)
+        {
+            Debug.WriteLine(
+                $"LoadModelFromPath failed: {ex}");
+
+            MessageBox.Show(
+                this,
+                ex.Message,
+                addToScene
+                    ? "Model could not be added"
+                    : "Model could not be loaded",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+        }
+    }
+
+    private void UpdateWindowTitle()
+    {
+        int modelCount =
+            _sceneDocument.Models.Count;
+
+        Text = modelCount switch
+        {
+            0 =>
+                "FastViewDX12",
+
+            1 =>
+                $"FastViewDX12 - {_sceneDocument.Models[0].Name}",
+
+            _ =>
+                $"FastViewDX12 - {modelCount} models"
+        };
     }
 
     /// <summary>
@@ -74,9 +203,9 @@ public sealed partial class MainForm
     /// Checks whether a path points to a GLB or glTF file.
     /// </summary>
     /// <param name="path">Candidate file path.</param>
-    /// <returns>True when the extension is supported.</returns>
+    /// <returns>True when the path exists and its extension is supported.</returns>
     private static bool IsSupportedModelPath(
-    string? path)
+        string? path)
     {
         if (string.IsNullOrWhiteSpace(path) ||
             !File.Exists(path))
@@ -95,5 +224,4 @@ public sealed partial class MainForm
                 ".gltf",
                 StringComparison.OrdinalIgnoreCase);
     }
-
 }

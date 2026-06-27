@@ -26,6 +26,39 @@ public sealed partial class MainForm
             new ToolStripMenuItem(
                 "&File");
 
+        var openModelItem =
+            new ToolStripMenuItem(
+                "&Open model...")
+            {
+                ShortcutKeys =
+                    Keys.Control |
+                    Keys.O
+            };
+
+        openModelItem.Click +=
+            (_, _) =>
+            {
+                ChooseModelFile(
+                    addToScene: false);
+            };
+
+        var addModelItem =
+            new ToolStripMenuItem(
+                "&Add model...")
+            {
+                ShortcutKeys =
+                    Keys.Control |
+                    Keys.Shift |
+                    Keys.O
+            };
+
+        addModelItem.Click +=
+            (_, _) =>
+            {
+                ChooseModelFile(
+                    addToScene: true);
+            };
+
         var exportPreviewItem =
             new ToolStripMenuItem(
                 "Export preview PNG...");
@@ -35,6 +68,15 @@ public sealed partial class MainForm
             {
                 ExportPreviewPng();
             };
+
+        fileMenu.DropDownItems.Add(
+            openModelItem);
+
+        fileMenu.DropDownItems.Add(
+            addModelItem);
+
+        fileMenu.DropDownItems.Add(
+            new ToolStripSeparator());
 
         fileMenu.DropDownItems.Add(
             exportPreviewItem);

@@ -19,6 +19,8 @@ public sealed partial class MainForm : Form
 
     private readonly Dx12Renderer _renderer;
 
+    private readonly SceneDocument _sceneDocument = new();
+
     private bool _isRotatingLight;
 
     private readonly string _stateFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FastViewDX12");
