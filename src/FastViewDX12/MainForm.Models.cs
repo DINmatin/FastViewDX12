@@ -112,9 +112,8 @@ public sealed partial class MainForm
                     loadedScene);
             }
 
-            _renderer.LoadScene(
-                _sceneDocument.BuildRenderScene());
-
+            RebuildRenderedScene();
+            RefreshSceneSidebar();
             UpdateWindowTitle();
 
             if (rememberAsLast)
@@ -141,6 +140,36 @@ public sealed partial class MainForm
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
         }
+    }
+
+    /// <summary>
+    /// Rebuilds the flattened renderer scene after the document model list changes.
+    /// </summary>
+    private void RebuildRenderedScene()
+    {
+        _renderer.LoadScene(
+            _sceneDocument.BuildRenderScene());
+    }
+
+    /// <summary>
+    /// Removes the currently selected model and keeps the remaining scene intact.
+    /// </summary>
+    private void RemoveSelectedSceneModel()
+    {
+        SceneModel? selectedModel =
+            _sceneDocument.SelectedModel;
+
+        if (selectedModel == null)
+        {
+            return;
+        }
+
+        _sceneDocument.Remove(
+            selectedModel.Id);
+
+        RebuildRenderedScene();
+        RefreshSceneSidebar();
+        UpdateWindowTitle();
     }
 
     private void UpdateWindowTitle()

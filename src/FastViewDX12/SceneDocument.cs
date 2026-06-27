@@ -16,12 +16,18 @@ public sealed class SceneDocument
     /// <summary>Gets the models in scene order.</summary>
     public IReadOnlyList<SceneModel> Models => _models;
 
+    /// <summary>Gets the model selected by the scene panel, if any.</summary>
+    public SceneModel? SelectedModel { get; private set; }
+
     /// <summary>Removes all existing models and inserts one new root model.</summary>
     public SceneModel ReplaceWith(
         string sourcePath,
         SceneData scene)
     {
         _models.Clear();
+        SelectedModel =
+            null;
+
         return Add(sourcePath, scene);
     }
 
@@ -39,7 +45,56 @@ public sealed class SceneDocument
                 scene);
 
         _models.Add(model);
+        SelectedModel =
+            model;
+
         return model;
+    }
+
+    /// <summary>Selects a model already contained in the document.</summary>
+    public void Select(
+        SceneModel? model)
+    {
+        SelectedModel =
+            model != null &&
+            _models.Contains(model)
+                ? model
+                : null;
+    }
+
+    /// <summary>Removes one model and selects the nearest remaining entry.</summary>
+    public bool Remove(
+        Guid modelId)
+    {
+        int index =
+            _models.FindIndex(
+                model =>
+                    model.Id == modelId);
+
+        if (index < 0)
+        {
+            return false;
+        }
+
+        _models.RemoveAt(index);
+
+        if (_models.Count == 0)
+        {
+            SelectedModel =
+                null;
+        }
+        else
+        {
+            int nextIndex =
+                Math.Min(
+                    index,
+                    _models.Count - 1);
+
+            SelectedModel =
+                _models[nextIndex];
+        }
+
+        return true;
     }
 
     /// <summary>
@@ -282,6 +337,11 @@ public sealed class SceneModel
         Vector3.One;
 
     /// <summary>Builds the model-to-scene transform using scale, XYZ rotation, and translation.</summary>
+    public override string ToString()
+    {
+        return Name;
+    }
+
     public Matrix4x4 CreateTransform()
     {
         const float degreesToRadians =

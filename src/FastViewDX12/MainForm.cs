@@ -73,10 +73,28 @@ public sealed partial class MainForm : Form
         _renderer = new Dx12Renderer(_renderPanel);
 
         _menuStrip =
-    CreateMainMenu();
+            CreateMainMenu();
+
+        InitializeSceneSidebar();
+
+        var contentPanel =
+            new Panel
+            {
+                Dock =
+                    DockStyle.Fill
+            };
+
+        contentPanel.Controls.Add(
+            _renderPanel);
+
+        contentPanel.Controls.Add(
+            _sceneSidebar);
+
+        _renderPanel.Controls.Add(
+            _sceneSidebarToggleButton);
 
         Controls.Add(
-            _renderPanel);
+            contentPanel);
 
         Controls.Add(
             _menuStrip);
@@ -87,7 +105,11 @@ public sealed partial class MainForm : Form
         _menuStrip.BringToFront();
 
         _renderPanel.HandleCreated += (_, _) => { _renderer.Initialize(); TryLoadDefaultEnvironmentMap(); TryLoadStartupModel(); };
-        _renderPanel.Resize += (_, _) => _renderer.Resize();
+        _renderPanel.Resize += (_, _) =>
+        {
+            _renderer.Resize();
+            PositionSceneSidebarToggle();
+        };
         _renderPanel.DragEnter += RenderPanel_DragEnter;
         _renderPanel.DragDrop += RenderPanel_DragDrop;
 
