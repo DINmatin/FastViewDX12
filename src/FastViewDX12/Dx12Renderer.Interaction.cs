@@ -188,13 +188,16 @@ public sealed partial class Dx12Renderer
     }
 
     /// <summary>
-    /// Forwards mouse movement to the active camera interaction.
+    /// Forwards mouse movement to the active camera interaction. Holding Shift
+    /// snaps orbit yaw and pitch to 90-degree increments.
     /// </summary>
     public void OnCameraMouseMove(
-        System.Drawing.Point mousePosition)
+        System.Drawing.Point mousePosition,
+        bool snapOrbitToRightAngles)
     {
         _camera.OnMouseMove(
-            mousePosition);
+            mousePosition,
+            snapOrbitToRightAngles);
     }
 
     /// <summary>

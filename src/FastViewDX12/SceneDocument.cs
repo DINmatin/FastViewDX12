@@ -294,6 +294,17 @@ public sealed class SceneDocument
 /// </summary>
 public sealed class SceneModel
 {
+    private Vector3 _rotationDegrees;
+
+    private Vector3 _scale =
+        Vector3.One;
+
+    // Store the exact affine linear transform separately from translation.
+    // Pure TRS edits rebuild this matrix, while global non-uniform scale can
+    // keep the shear component that a Vector3 scale alone cannot represent.
+    private Matrix4x4 _linearTransform =
+        Matrix4x4.Identity;
+
     /// <summary>Creates a scene-model entry around one loaded glTF scene.</summary>
     public SceneModel(
         string sourcePath,
@@ -329,40 +340,479 @@ public sealed class SceneModel
     /// <summary>Gets or sets the model translation in scene units.</summary>
     public Vector3 Position { get; set; }
 
-    /// <summary>Gets or sets XYZ Euler rotation in degrees.</summary>
-    public Vector3 RotationDegrees { get; set; }
+    /// <summary>
+    /// Gets or sets the inspector's XYZ Euler rotation in degrees. Editing this
+    /// value intentionally returns the model to a pure scale/rotation matrix.
+    /// </summary>
+    public Vector3 RotationDegrees
+    {
+        get =>
+            _rotationDegrees;
 
-    /// <summary>Gets or sets independent XYZ scale.</summary>
-    public Vector3 Scale { get; set; } =
-        Vector3.One;
+        set
+        {
+            _rotationDegrees =
+                value;
 
-    /// <summary>Builds the model-to-scene transform using scale, XYZ rotation, and translation.</summary>
+            RebuildLinearTransformFromInspector();
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets the inspector's independent XYZ scale. Editing this value
+    /// intentionally returns the model to a pure scale/rotation matrix.
+    /// </summary>
+    public Vector3 Scale
+    {
+        get =>
+            _scale;
+
+        set
+        {
+            _scale =
+                value;
+
+            RebuildLinearTransformFromInspector();
+        }
+    }
+
+    /// <summary>
+    /// Gets the exact model-space-to-world linear transform without translation.
+    /// It may contain shear after a global non-uniform scale operation.
+    /// </summary>
+    public Matrix4x4 LinearTransform =>
+        _linearTransform;
+
     public override string ToString()
     {
         return Name;
     }
 
+    /// <summary>
+    /// Replaces the exact linear transform used by the renderer. The inspector
+    /// rotation and scale are updated to the nearest readable TRS values without
+    /// discarding the exact matrix.
+    /// </summary>
+    public void SetLinearTransform(
+        Matrix4x4 linearTransform)
+    {
+        linearTransform.M14 =
+            0.0f;
+
+        linearTransform.M24 =
+            0.0f;
+
+        linearTransform.M34 =
+            0.0f;
+
+        linearTransform.M41 =
+            0.0f;
+
+        linearTransform.M42 =
+            0.0f;
+
+        linearTransform.M43 =
+            0.0f;
+
+        linearTransform.M44 =
+            1.0f;
+
+        _linearTransform =
+            linearTransform;
+
+        UpdateInspectorValuesFromLinearTransform();
+    }
+
+    /// <summary>Builds the exact model-to-scene transform.</summary>
     public Matrix4x4 CreateTransform()
+    {
+        return
+            _linearTransform *
+            Matrix4x4.CreateTranslation(
+                Position);
+    }
+
+    private void RebuildLinearTransformFromInspector()
     {
         const float degreesToRadians =
             MathF.PI / 180.0f;
 
         Matrix4x4 rotation =
             Matrix4x4.CreateRotationX(
-                RotationDegrees.X *
+                _rotationDegrees.X *
                 degreesToRadians) *
             Matrix4x4.CreateRotationY(
-                RotationDegrees.Y *
+                _rotationDegrees.Y *
                 degreesToRadians) *
             Matrix4x4.CreateRotationZ(
-                RotationDegrees.Z *
+                _rotationDegrees.Z *
                 degreesToRadians);
 
-        return
+        _linearTransform =
             Matrix4x4.CreateScale(
-                Scale) *
-            rotation *
-            Matrix4x4.CreateTranslation(
-                Position);
+                _scale) *
+            rotation;
+    }
+
+    private void UpdateInspectorValuesFromLinearTransform()
+    {
+        Vector3 rowX =
+            new(
+                _linearTransform.M11,
+                _linearTransform.M12,
+                _linearTransform.M13);
+
+        Vector3 rowY =
+            new(
+                _linearTransform.M21,
+                _linearTransform.M22,
+                _linearTransform.M23);
+
+        Vector3 rowZ =
+            new(
+                _linearTransform.M31,
+                _linearTransform.M32,
+                _linearTransform.M33);
+
+        float scaleX =
+            MathF.Max(
+                rowX.Length(),
+                0.000001f);
+
+        float scaleY =
+            MathF.Max(
+                rowY.Length(),
+                0.000001f);
+
+        float scaleZ =
+            MathF.Max(
+                rowZ.Length(),
+                0.000001f);
+
+        float signX =
+            SignOrPositive(
+                _scale.X);
+
+        float signY =
+            SignOrPositive(
+                _scale.Y);
+
+        float signZ =
+            SignOrPositive(
+                _scale.Z);
+
+        float determinant =
+            Determinant3x3(
+                _linearTransform);
+
+        float requestedSignProduct =
+            determinant < 0.0f
+                ? -1.0f
+                : 1.0f;
+
+        float currentSignProduct =
+            signX *
+            signY *
+            signZ;
+
+        if (currentSignProduct !=
+            requestedSignProduct)
+        {
+            if (scaleX >= scaleY &&
+                scaleX >= scaleZ)
+            {
+                signX =
+                    -signX;
+            }
+            else if (scaleY >= scaleZ)
+            {
+                signY =
+                    -signY;
+            }
+            else
+            {
+                signZ =
+                    -signZ;
+            }
+        }
+
+        Vector3 approximateScale =
+            new(
+                scaleX * signX,
+                scaleY * signY,
+                scaleZ * signZ);
+
+        Vector3 axisX =
+            NormalizeOrFallback(
+                rowX /
+                approximateScale.X,
+                Vector3.UnitX);
+
+        Vector3 axisYSource =
+            rowY /
+            approximateScale.Y;
+
+        Vector3 axisY =
+            axisYSource -
+            axisX *
+            Vector3.Dot(
+                axisYSource,
+                axisX);
+
+        if (axisY.LengthSquared() <
+            0.00000001f)
+        {
+            Vector3 axisZSource =
+                rowZ /
+                approximateScale.Z;
+
+            axisY =
+                Vector3.Cross(
+                    axisZSource,
+                    axisX);
+        }
+
+        axisY =
+            NormalizeOrFallback(
+                axisY,
+                Vector3.UnitY);
+
+        Vector3 axisZ =
+            NormalizeOrFallback(
+                Vector3.Cross(
+                    axisX,
+                    axisY),
+                Vector3.UnitZ);
+
+        Vector3 expectedAxisZ =
+            NormalizeOrFallback(
+                rowZ /
+                approximateScale.Z,
+                Vector3.UnitZ);
+
+        if (Vector3.Dot(
+                axisZ,
+                expectedAxisZ) <
+            0.0f)
+        {
+            axisY =
+                -axisY;
+
+            axisZ =
+                -axisZ;
+        }
+
+        Matrix4x4 approximateRotation =
+            new(
+                axisX.X,
+                axisX.Y,
+                axisX.Z,
+                0.0f,
+                axisY.X,
+                axisY.Y,
+                axisY.Z,
+                0.0f,
+                axisZ.X,
+                axisZ.Y,
+                axisZ.Z,
+                0.0f,
+                0.0f,
+                0.0f,
+                0.0f,
+                1.0f);
+
+        _rotationDegrees =
+            ExtractEulerRotationDegrees(
+                approximateRotation,
+                _rotationDegrees);
+
+        _scale =
+            approximateScale;
+    }
+
+    private static float SignOrPositive(
+        float value)
+    {
+        return value < 0.0f
+            ? -1.0f
+            : 1.0f;
+    }
+
+    private static float Determinant3x3(
+        Matrix4x4 matrix)
+    {
+        return
+            matrix.M11 *
+                (matrix.M22 * matrix.M33 -
+                 matrix.M23 * matrix.M32) -
+            matrix.M12 *
+                (matrix.M21 * matrix.M33 -
+                 matrix.M23 * matrix.M31) +
+            matrix.M13 *
+                (matrix.M21 * matrix.M32 -
+                 matrix.M22 * matrix.M31);
+    }
+
+    private static Vector3 NormalizeOrFallback(
+        Vector3 value,
+        Vector3 fallback)
+    {
+        return value.LengthSquared() >
+            0.00000001f
+            ? Vector3.Normalize(
+                value)
+            : fallback;
+    }
+
+    private static Vector3 ExtractEulerRotationDegrees(
+        Matrix4x4 rotation,
+        Vector3 referenceDegrees)
+    {
+        const float radiansToDegrees =
+            180.0f / MathF.PI;
+
+        float sinY =
+            Math.Clamp(
+                -rotation.M13,
+                -1.0f,
+                1.0f);
+
+        float y =
+            MathF.Asin(
+                sinY);
+
+        float cosY =
+            MathF.Cos(
+                y);
+
+        float x;
+        float z;
+
+        if (MathF.Abs(cosY) >
+            0.00001f)
+        {
+            x =
+                MathF.Atan2(
+                    rotation.M23,
+                    rotation.M33);
+
+            z =
+                MathF.Atan2(
+                    rotation.M12,
+                    rotation.M11);
+        }
+        else if (sinY >=
+            0.0f)
+        {
+            z =
+                referenceDegrees.Z /
+                radiansToDegrees;
+
+            float xMinusZ =
+                MathF.Atan2(
+                    rotation.M21,
+                    rotation.M22);
+
+            x =
+                xMinusZ +
+                z;
+        }
+        else
+        {
+            z =
+                referenceDegrees.Z /
+                radiansToDegrees;
+
+            float xPlusZ =
+                MathF.Atan2(
+                    -rotation.M21,
+                    rotation.M22);
+
+            x =
+                xPlusZ -
+                z;
+        }
+
+        Vector3 primary =
+            new(
+                x * radiansToDegrees,
+                y * radiansToDegrees,
+                z * radiansToDegrees);
+
+        primary =
+            UnwrapEulerNear(
+                primary,
+                referenceDegrees);
+
+        if (MathF.Abs(cosY) <=
+            0.00001f)
+        {
+            return primary;
+        }
+
+        Vector3 alternate =
+            new(
+                primary.X + 180.0f,
+                180.0f - primary.Y,
+                primary.Z + 180.0f);
+
+        alternate =
+            UnwrapEulerNear(
+                alternate,
+                referenceDegrees);
+
+        return Vector3.DistanceSquared(
+                alternate,
+                referenceDegrees) <
+            Vector3.DistanceSquared(
+                primary,
+                referenceDegrees)
+                ? alternate
+                : primary;
+    }
+
+    private static Vector3 UnwrapEulerNear(
+        Vector3 value,
+        Vector3 reference)
+    {
+        value.X =
+            UnwrapDegreesNear(
+                value.X,
+                reference.X);
+
+        value.Y =
+            UnwrapDegreesNear(
+                value.Y,
+                reference.Y);
+
+        value.Z =
+            UnwrapDegreesNear(
+                value.Z,
+                reference.Z);
+
+        return value;
+    }
+
+    private static float UnwrapDegreesNear(
+        float degrees,
+        float referenceDegrees)
+    {
+        while (degrees -
+               referenceDegrees >
+               180.0f)
+        {
+            degrees -=
+                360.0f;
+        }
+
+        while (degrees -
+               referenceDegrees <
+               -180.0f)
+        {
+            degrees +=
+                360.0f;
+        }
+
+        return degrees;
     }
 }

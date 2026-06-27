@@ -161,7 +161,7 @@ public sealed partial class MainForm
         bool fitCamera = true)
     {
         _renderer.LoadScene(
-            _sceneDocument.BuildRenderScene(),
+            BuildEditorRenderScene(),
             fitCamera);
     }
 
@@ -172,7 +172,7 @@ public sealed partial class MainForm
     private void UpdateRenderedSceneGeometry()
     {
         _renderer.UpdateSceneGeometry(
-            _sceneDocument.BuildRenderScene());
+            BuildEditorRenderScene());
     }
 
     /// <summary>

@@ -21,6 +21,13 @@ public sealed class CameraController
     private bool _isOrbiting;
     private bool _isPanning;
 
+    // Raw orbit angles remain continuous while the displayed camera is
+    // temporarily snapped with Shift. This prevents snapping from destroying
+    // the underlying mouse-drag position.
+    private float _orbitRawYaw;
+    private float _orbitRawPitch;
+    private bool _orbitSnapActive;
+
     private Point _lastMouse;
 
     /// <summary>
@@ -124,23 +131,30 @@ public sealed class CameraController
     }
 
     /// <summary>
-    /// Sets yaw and pitch directly, clamping pitch before the camera reaches the vertical singularity.
+    /// Sets yaw and pitch directly. Exact top and bottom views are supported,
+    /// so 90-degree Shift snapping can reach every primary camera direction.
     /// </summary>
     public void SetOrbitAngles(
         float yawRadians,
         float pitchRadians)
     {
+        float pitchLimit =
+            MathF.PI * 0.5f;
+
         _yaw =
             yawRadians;
-
-        float pitchLimit =
-            MathF.PI * 0.49f;
 
         _pitch =
             Math.Clamp(
                 pitchRadians,
                 -pitchLimit,
                 pitchLimit);
+
+        _orbitRawYaw =
+            _yaw;
+
+        _orbitRawPitch =
+            _pitch;
     }
 
     /// <summary>
@@ -159,23 +173,13 @@ public sealed class CameraController
                 _target -
                 eye);
 
+        // Derive right from yaw instead of crossing with world-up. This
+        // stays stable at exact top/bottom views where forward is parallel to Y.
         right =
-            Vector3.Cross(
-                forward,
-                Vector3.UnitY);
-
-        if (right.LengthSquared() <
-            0.000001f)
-        {
-            right =
-                Vector3.UnitX;
-        }
-        else
-        {
-            right =
-                Vector3.Normalize(
-                    right);
-        }
+            new Vector3(
+                MathF.Cos(_yaw),
+                0.0f,
+                -MathF.Sin(_yaw));
 
         up =
             Vector3.Normalize(
@@ -191,6 +195,9 @@ public sealed class CameraController
     {
         _isOrbiting = true;
         _isPanning = false;
+        _orbitRawYaw = _yaw;
+        _orbitRawPitch = _pitch;
+        _orbitSnapActive = false;
         _lastMouse = mousePosition;
     }
 
@@ -201,6 +208,7 @@ public sealed class CameraController
     {
         _isPanning = true;
         _isOrbiting = false;
+        _orbitSnapActive = false;
         _lastMouse = mousePosition;
     }
 
@@ -211,12 +219,16 @@ public sealed class CameraController
     {
         _isOrbiting = false;
         _isPanning = false;
+        _orbitSnapActive = false;
     }
 
     /// <summary>
     /// Applies an orbit or pan delta when a matching interaction is active.
+    /// Shift snaps camera yaw and pitch to 90-degree increments.
     /// </summary>
-    public void OnMouseMove(Point mousePosition)
+    public void OnMouseMove(
+        Point mousePosition,
+        bool snapOrbitToRightAngles)
     {
         int dx =
             mousePosition.X -
@@ -232,46 +244,65 @@ public sealed class CameraController
         {
             const float orbitSpeed = 0.01f;
 
+            // Rebase the continuous drag whenever Shift is pressed or released.
+            // That avoids a jump back to an old unsnapped angle.
+            if (_orbitSnapActive !=
+                snapOrbitToRightAngles)
+            {
+                _orbitRawYaw =
+                    _yaw;
+
+                _orbitRawPitch =
+                    _pitch;
+
+                _orbitSnapActive =
+                    snapOrbitToRightAngles;
+            }
+
             // Invert horizontal drag so the model appears to follow the mouse.
-            _yaw -= dx * orbitSpeed;
-            _pitch += dy * orbitSpeed;
+            _orbitRawYaw -=
+                dx * orbitSpeed;
+
+            _orbitRawPitch +=
+                dy * orbitSpeed;
 
             float pitchLimit =
-                MathF.PI * 0.49f;
+                MathF.PI * 0.5f;
 
-            _pitch = Math.Clamp(
-                _pitch,
-                -pitchLimit,
-                pitchLimit);
-        }
-        else if (_isPanning)
-        {
-            Vector3 eye =
-                GetEyePosition();
+            _orbitRawPitch =
+                Math.Clamp(
+                    _orbitRawPitch,
+                    -pitchLimit,
+                    pitchLimit);
 
-            Vector3 forward =
-                Vector3.Normalize(
-                    _target - eye);
-
-            Vector3 right =
-                Vector3.Cross(
-                    forward,
-                    Vector3.UnitY);
-
-            if (right.LengthSquared() < 0.000001f)
+            if (snapOrbitToRightAngles)
             {
-                right = Vector3.UnitX;
+                _yaw =
+                    SnapToRightAngle(
+                        _orbitRawYaw);
+
+                _pitch =
+                    Math.Clamp(
+                        SnapToRightAngle(
+                            _orbitRawPitch),
+                        -pitchLimit,
+                        pitchLimit);
             }
             else
             {
-                right = Vector3.Normalize(right);
-            }
+                _yaw =
+                    _orbitRawYaw;
 
-            Vector3 up =
-                Vector3.Normalize(
-                    Vector3.Cross(
-                        right,
-                        forward));
+                _pitch =
+                    _orbitRawPitch;
+            }
+        }
+        else if (_isPanning)
+        {
+            GetViewBasis(
+                out _,
+                out Vector3 right,
+                out Vector3 up);
 
             float panScale =
                 _distance * 0.0025f;
@@ -311,11 +342,16 @@ public sealed class CameraController
             _viewportWidth /
             (float)_viewportHeight;
 
+        GetViewBasis(
+            out _,
+            out _,
+            out Vector3 cameraUp);
+
         Matrix4x4 view =
             Matrix4x4.CreateLookAt(
                 GetEyePosition(),
                 _target,
-                Vector3.UnitY);
+                cameraUp);
 
         Matrix4x4 projection =
             Matrix4x4.CreatePerspectiveFieldOfView(
@@ -326,6 +362,20 @@ public sealed class CameraController
 
         return view * projection;
     }
+    private static float SnapToRightAngle(
+        float angleRadians)
+    {
+        float rightAngle =
+            MathF.PI * 0.5f;
+
+        return
+            MathF.Round(
+                angleRadians /
+                rightAngle,
+                MidpointRounding.AwayFromZero) *
+            rightAngle;
+    }
+
     /// <summary>
     /// Returns the current world-space eye position.
     /// </summary>

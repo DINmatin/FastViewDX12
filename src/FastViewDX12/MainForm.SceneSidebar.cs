@@ -675,7 +675,7 @@ public sealed partial class MainForm
                         54),
 
                 ColumnCount =
-                    7,
+                    8,
 
                 Height =
                     29,
@@ -701,7 +701,7 @@ public sealed partial class MainForm
         row.ColumnStyles.Add(
             new ColumnStyle(
                 SizeType.Absolute,
-                68));
+                58));
 
         row.ColumnStyles.Add(
             new ColumnStyle(
@@ -732,6 +732,11 @@ public sealed partial class MainForm
             new ColumnStyle(
                 SizeType.Percent,
                 33.334f));
+
+        row.ColumnStyles.Add(
+            new ColumnStyle(
+                SizeType.Absolute,
+                28));
 
         var label =
             new Label
@@ -798,6 +803,75 @@ public sealed partial class MainForm
         row.Controls.Add(
             label,
             0,
+            0);
+
+        var resetRowButton =
+            new Button
+            {
+                Text =
+                    "↺",
+
+                AccessibleName =
+                    $"Reset {labelText}",
+
+                Dock =
+                    DockStyle.Fill,
+
+                FlatStyle =
+                    FlatStyle.Flat,
+
+                BackColor =
+                    row.BackColor,
+
+                ForeColor =
+                    Color.Gainsboro,
+
+                Margin =
+                    new Padding(
+                        2,
+                        0,
+                        0,
+                        0),
+
+                Padding =
+                    new Padding(
+                        0),
+
+                TabStop =
+                    false
+            };
+
+        resetRowButton.FlatAppearance.BorderSize =
+            0;
+
+        resetRowButton.Click +=
+            (_, _) =>
+            {
+                switch (kind)
+                {
+                    case TransformVectorKind.Position:
+                        model.Position =
+                            Vector3.Zero;
+                        break;
+
+                    case TransformVectorKind.Rotation:
+                        model.RotationDegrees =
+                            Vector3.Zero;
+                        break;
+
+                    case TransformVectorKind.Scale:
+                        model.Scale =
+                            Vector3.One;
+                        break;
+                }
+
+                ApplySceneModelTransform();
+                RefreshSceneSidebar();
+            };
+
+        row.Controls.Add(
+            resetRowButton,
+            7,
             0);
 
         void HandleValueChanged(

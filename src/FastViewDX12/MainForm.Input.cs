@@ -109,6 +109,10 @@ public sealed partial class MainForm
         UpdateMoveGizmoHover(
             e.Location);
 
+        bool shiftPressed =
+            (ModifierKeys & Keys.Shift) ==
+            Keys.Shift;
+
         if (_isRotatingLight)
         {
             _renderer.OnLightMouseMove(
@@ -153,13 +157,15 @@ public sealed partial class MainForm
             }
 
             _renderer.OnCameraMouseMove(
-                e.Location);
+                e.Location,
+                shiftPressed);
 
             return;
         }
 
         _renderer.OnCameraMouseMove(
-            e.Location);
+            e.Location,
+            shiftPressed);
     }
 
     /// <summary>
@@ -318,8 +324,9 @@ public sealed partial class MainForm
     }
 
     /// <summary>
-    /// W, E, and R select Move, Rotate, and Scale. F frames the selected model,
-    /// or the complete scene when no model is selected.
+    /// W, E, and R select Move, Rotate, and Scale. L toggles Local/Global
+    /// transform orientation. G toggles the optional ground grid. F frames the
+    /// selected model, or the complete scene when no model is selected.
     /// </summary>
     private void MainForm_KeyDown(
         object? sender,
@@ -351,8 +358,16 @@ public sealed partial class MainForm
                     TransformGizmoMode.Scale);
                 break;
 
+            case Keys.L:
+                ToggleTransformGizmoOrientation();
+                break;
+
             case Keys.F:
                 FocusSelectedModelOrScene();
+                break;
+
+            case Keys.G:
+                ToggleGroundGrid();
                 break;
 
             default:

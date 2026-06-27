@@ -7,9 +7,9 @@ using System.Windows.Forms;
 
 namespace FastViewDX12;
 
-// Screen-space editor overlay for moving and rotating the selected model on
-// global axes, and scaling it on its local model axes. The overlay stays
-// outside the Direct3D scene, so it never appears in thumbnails or exports.
+// Screen-space editor overlay for moving, rotating, and scaling the selected
+// model in either global or local orientation. The overlay stays outside the
+// Direct3D scene, so it never appears in thumbnails or exports.
 public sealed partial class MainForm
 {
     private const float TransformGizmoLengthPixels =
@@ -24,6 +24,9 @@ public sealed partial class MainForm
     private const float RotationDegreesPerPixel =
         0.75f;
 
+    private const float RotationSnapDegrees =
+        90.0f;
+
     // Keep rotation rings readable when their real 3D plane is viewed almost
     // edge-on. The ring still indicates its plane, but no longer collapses
     // into an awkward one-pixel line.
@@ -32,6 +35,9 @@ public sealed partial class MainForm
 
     private const float ScaleExponentPerPixel =
         0.012f;
+
+    private const float UniformScaleHandleSizePixels =
+        18.0f;
 
     private const float MinimumGizmoScale =
         0.001f;
@@ -48,6 +54,12 @@ public sealed partial class MainForm
     private TransformGizmoMode _draggedTransformGizmoMode =
         TransformGizmoMode.Move;
 
+    private TransformGizmoOrientation _transformGizmoOrientation =
+        TransformGizmoOrientation.Global;
+
+    private TransformGizmoOrientation _draggedTransformGizmoOrientation =
+        TransformGizmoOrientation.Global;
+
     private TransformGizmoAxis _hoveredMoveGizmoAxis;
 
     private TransformGizmoAxis _draggedMoveGizmoAxis;
@@ -58,13 +70,24 @@ public sealed partial class MainForm
 
     private Vector3 _moveGizmoDragStartPosition;
 
-    private Vector3 _moveGizmoDragStartRotationDegrees;
+    private Matrix4x4 _moveGizmoDragStartLinearTransform;
 
-    private Vector3 _moveGizmoDragStartScale;
+    private Vector3 _moveGizmoDragWorldAxis;
 
     private Vector2 _moveGizmoDragScreenDirection;
 
     private float _moveGizmoDragWorldUnitsPerPixel;
+
+    // Rotation dragging uses an accumulated world-axis delta rather than
+    // editing one Euler component directly. The displayed rings are global,
+    // so the applied transform must use those same global axes.
+    private float _rotationGizmoDragRawDeltaDegrees;
+
+    private float _rotationGizmoDragAppliedDeltaDegrees;
+
+    private float _rotationGizmoDragLastPixelDistance;
+
+    private bool _rotationGizmoDragSnapActive;
 
     private MoveGizmoOverlayForm? _moveGizmoOverlayForm;
 
@@ -81,6 +104,9 @@ public sealed partial class MainForm
     private TransformGizmoMode _paintedTransformGizmoMode =
         TransformGizmoMode.Move;
 
+    private TransformGizmoOrientation _paintedTransformGizmoOrientation =
+        TransformGizmoOrientation.Global;
+
     private enum TransformGizmoMode
     {
         Move,
@@ -88,24 +114,43 @@ public sealed partial class MainForm
         Scale
     }
 
+    private enum TransformGizmoOrientation
+    {
+        Global,
+        Local
+    }
+
     private enum TransformGizmoAxis
     {
         None,
         X,
         Y,
-        Z
+        Z,
+        Uniform
     }
 
     private readonly struct TransformGizmoAnchor
     {
         public TransformGizmoAnchor(
             PointF origin,
+            Vector3 worldX,
+            Vector3 worldY,
+            Vector3 worldZ,
             Vector2 projectedX,
             Vector2 projectedY,
             Vector2 projectedZ)
         {
             Origin =
                 origin;
+
+            WorldX =
+                worldX;
+
+            WorldY =
+                worldY;
+
+            WorldZ =
+                worldZ;
 
             ProjectedX =
                 projectedX;
@@ -119,6 +164,12 @@ public sealed partial class MainForm
 
         public PointF Origin { get; }
 
+        public Vector3 WorldX { get; }
+
+        public Vector3 WorldY { get; }
+
+        public Vector3 WorldZ { get; }
+
         public Vector2 ProjectedX { get; }
 
         public Vector2 ProjectedY { get; }
@@ -130,6 +181,7 @@ public sealed partial class MainForm
     {
         public TransformGizmoAxisLayout(
             TransformGizmoAxis axis,
+            Vector3 worldAxis,
             PointF end,
             Vector2 screenDirection,
             float worldUnitsPerPixel,
@@ -137,6 +189,9 @@ public sealed partial class MainForm
         {
             Axis =
                 axis;
+
+            WorldAxis =
+                worldAxis;
 
             End =
                 end;
@@ -153,6 +208,8 @@ public sealed partial class MainForm
 
         public TransformGizmoAxis Axis { get; }
 
+        public Vector3 WorldAxis { get; }
+
         public PointF End { get; }
 
         public Vector2 ScreenDirection { get; }
@@ -166,11 +223,15 @@ public sealed partial class MainForm
     {
         public TransformGizmoHit(
             TransformGizmoAxis axis,
+            Vector3 worldAxis,
             Vector2 dragScreenDirection,
             float worldUnitsPerPixel)
         {
             Axis =
                 axis;
+
+            WorldAxis =
+                worldAxis;
 
             DragScreenDirection =
                 dragScreenDirection;
@@ -181,6 +242,8 @@ public sealed partial class MainForm
 
         public TransformGizmoAxis Axis { get; }
 
+        public Vector3 WorldAxis { get; }
+
         public Vector2 DragScreenDirection { get; }
 
         public float WorldUnitsPerPixel { get; }
@@ -189,6 +252,8 @@ public sealed partial class MainForm
     private sealed class TransformGizmoLayout
     {
         public required TransformGizmoMode Mode { get; init; }
+
+        public required TransformGizmoOrientation Orientation { get; init; }
 
         public required PointF Origin { get; init; }
 
@@ -225,9 +290,58 @@ public sealed partial class MainForm
         _renderPanel.Cursor =
             Cursors.Default;
 
+        TransformToolbarStateChanged();
         UpdateMoveGizmoOverlay();
         _moveGizmoOverlayForm?.Update();
     }
+
+    /// <summary>
+    /// Switches every transform tool between world axes and the selected
+    /// model's current local axes.
+    /// </summary>
+    private void ToggleTransformGizmoOrientation()
+    {
+        SetTransformGizmoOrientation(
+            _transformGizmoOrientation ==
+                TransformGizmoOrientation.Global
+                ? TransformGizmoOrientation.Local
+                : TransformGizmoOrientation.Global);
+    }
+
+    private void SetTransformGizmoOrientation(
+        TransformGizmoOrientation orientation)
+    {
+        if (_draggedMoveGizmoAxis !=
+                TransformGizmoAxis.None ||
+            _transformGizmoOrientation ==
+                orientation)
+        {
+            return;
+        }
+
+        _transformGizmoOrientation =
+            orientation;
+
+        _hoveredMoveGizmoAxis =
+            TransformGizmoAxis.None;
+
+        _moveGizmoOverlayAnchor =
+            null;
+
+        _moveGizmoOverlayLayout =
+            null;
+
+        _renderPanel.Cursor =
+            Cursors.Default;
+
+        TransformToolbarStateChanged();
+        UpdateMoveGizmoOverlay();
+        _moveGizmoOverlayForm?.Update();
+    }
+
+    // The toolbar patch implements this optional hook. The transform core can
+    // be committed and tested independently before any UI is added.
+    partial void TransformToolbarStateChanged();
 
     /// <summary>
     /// Keeps a transparent, click-through overlay window aligned with the
@@ -279,7 +393,9 @@ public sealed partial class MainForm
         bool modeChanged =
             _moveGizmoOverlayLayout == null ||
             _moveGizmoOverlayLayout.Mode !=
-            _transformGizmoMode;
+                _transformGizmoMode ||
+            _moveGizmoOverlayLayout.Orientation !=
+                _transformGizmoOrientation;
 
         bool layoutChanged =
             anchorChanged ||
@@ -293,7 +409,8 @@ public sealed partial class MainForm
             _moveGizmoOverlayLayout =
                 CreateTransformGizmoLayout(
                     anchor,
-                    _transformGizmoMode);
+                    _transformGizmoMode,
+                    _transformGizmoOrientation);
         }
 
         if (_moveGizmoOverlayLayout == null ||
@@ -310,7 +427,9 @@ public sealed partial class MainForm
             _paintedDraggedMoveGizmoAxis !=
                 _draggedMoveGizmoAxis ||
             _paintedTransformGizmoMode !=
-                _transformGizmoMode;
+                _transformGizmoMode ||
+            _paintedTransformGizmoOrientation !=
+                _transformGizmoOrientation;
 
         bool wasVisible =
             overlay.Visible;
@@ -323,6 +442,9 @@ public sealed partial class MainForm
 
         _paintedTransformGizmoMode =
             _transformGizmoMode;
+
+        _paintedTransformGizmoOrientation =
+            _transformGizmoOrientation;
 
         if (!wasVisible)
         {
@@ -459,16 +581,33 @@ public sealed partial class MainForm
             }
         }
 
-        using var centerBrush =
-            new SolidBrush(
-                Color.White);
+        if (layout.Mode ==
+            TransformGizmoMode.Scale)
+        {
+            bool uniformHighlighted =
+                _draggedMoveGizmoAxis ==
+                    TransformGizmoAxis.Uniform ||
+                _hoveredMoveGizmoAxis ==
+                    TransformGizmoAxis.Uniform;
 
-        graphics.FillEllipse(
-            centerBrush,
-            layout.Origin.X - 3.0f,
-            layout.Origin.Y - 3.0f,
-            6.0f,
-            6.0f);
+            DrawUniformScaleHandle(
+                graphics,
+                layout.Origin,
+                uniformHighlighted);
+        }
+        else
+        {
+            using var centerBrush =
+                new SolidBrush(
+                    Color.White);
+
+            graphics.FillEllipse(
+                centerBrush,
+                layout.Origin.X - 3.0f,
+                layout.Origin.Y - 3.0f,
+                6.0f,
+                6.0f);
+        }
     }
 
     private static void DrawMoveGizmoAxis(
@@ -562,6 +701,57 @@ public sealed partial class MainForm
             graphics,
             axis,
             color);
+    }
+
+    private static void DrawUniformScaleHandle(
+        Graphics graphics,
+        PointF origin,
+        bool highlighted)
+    {
+        float size =
+            highlighted
+                ? UniformScaleHandleSizePixels +
+                  4.0f
+                : UniformScaleHandleSizePixels;
+
+        Color fillColor =
+            highlighted
+                ? Color.FromArgb(
+                    255,
+                    235,
+                    90)
+                : Color.White;
+
+        RectangleF handleBounds =
+            new(
+                origin.X - size * 0.5f,
+                origin.Y - size * 0.5f,
+                size,
+                size);
+
+        using var brush =
+            new SolidBrush(
+                fillColor);
+
+        using var outlinePen =
+            new Pen(
+                Color.FromArgb(
+                    220,
+                    28,
+                    28,
+                    32),
+                2.0f);
+
+        graphics.FillRectangle(
+            brush,
+            handleBounds);
+
+        graphics.DrawRectangle(
+            outlinePen,
+            handleBounds.X,
+            handleBounds.Y,
+            handleBounds.Width,
+            handleBounds.Height);
     }
 
     private static Pen CreateTransformGizmoPen(
@@ -676,35 +866,31 @@ public sealed partial class MainForm
         Vector3 worldAxisZ =
             Vector3.UnitZ;
 
-        // SceneModel.Scale is stored in model-local XYZ. A global-looking
-        // scale gizmo therefore lies about the operation once the model has
-        // been rotated. Rotate only the scale handles with the model so each
-        // displayed handle controls the matching Scale.X/Y/Z component.
-        if (_transformGizmoMode ==
-            TransformGizmoMode.Scale)
+        if (_transformGizmoOrientation ==
+            TransformGizmoOrientation.Local)
         {
-            Matrix4x4 modelTransform =
-                model.CreateTransform();
+            Matrix4x4 linearTransform =
+                model.LinearTransform;
 
             worldAxisX =
                 NormalizeGizmoAxis(
                     Vector3.TransformNormal(
                         Vector3.UnitX,
-                        modelTransform),
+                        linearTransform),
                     Vector3.UnitX);
 
             worldAxisY =
                 NormalizeGizmoAxis(
                     Vector3.TransformNormal(
                         Vector3.UnitY,
-                        modelTransform),
+                        linearTransform),
                     Vector3.UnitY);
 
             worldAxisZ =
                 NormalizeGizmoAxis(
                     Vector3.TransformNormal(
                         Vector3.UnitZ,
-                        modelTransform),
+                        linearTransform),
                     Vector3.UnitZ);
         }
 
@@ -736,6 +922,9 @@ public sealed partial class MainForm
         anchor =
             new TransformGizmoAnchor(
                 origin,
+                worldAxisX,
+                worldAxisY,
+                worldAxisZ,
                 projectedX,
                 projectedY,
                 projectedZ);
@@ -806,12 +995,25 @@ public sealed partial class MainForm
             Vector2.DistanceSquared(
                 first.ProjectedZ,
                 second.ProjectedZ) <=
+                vectorToleranceSquared &&
+            Vector3.DistanceSquared(
+                first.WorldX,
+                second.WorldX) <=
+                vectorToleranceSquared &&
+            Vector3.DistanceSquared(
+                first.WorldY,
+                second.WorldY) <=
+                vectorToleranceSquared &&
+            Vector3.DistanceSquared(
+                first.WorldZ,
+                second.WorldZ) <=
                 vectorToleranceSquared;
     }
 
     private static TransformGizmoLayout CreateTransformGizmoLayout(
         TransformGizmoAnchor anchor,
-        TransformGizmoMode mode)
+        TransformGizmoMode mode,
+        TransformGizmoOrientation orientation)
     {
         var axes =
             new List<TransformGizmoAxisLayout>(
@@ -830,18 +1032,21 @@ public sealed partial class MainForm
                 axes,
                 anchor.Origin,
                 TransformGizmoAxis.X,
+                anchor.WorldX,
                 anchor.ProjectedX);
 
             AddLinearGizmoAxis(
                 axes,
                 anchor.Origin,
                 TransformGizmoAxis.Y,
+                anchor.WorldY,
                 anchor.ProjectedY);
 
             AddLinearGizmoAxis(
                 axes,
                 anchor.Origin,
                 TransformGizmoAxis.Z,
+                anchor.WorldZ,
                 anchor.ProjectedZ);
         }
 
@@ -849,6 +1054,9 @@ public sealed partial class MainForm
         {
             Mode =
                 mode,
+
+            Orientation =
+                orientation,
 
             Origin =
                 anchor.Origin,
@@ -862,6 +1070,7 @@ public sealed partial class MainForm
         List<TransformGizmoAxisLayout> axes,
         PointF screenOrigin,
         TransformGizmoAxis axis,
+        Vector3 worldAxis,
         Vector2 projectedDirection)
     {
         float pixelsPerWorldUnit =
@@ -891,6 +1100,7 @@ public sealed partial class MainForm
         axes.Add(
             new TransformGizmoAxisLayout(
                 axis,
+                worldAxis,
                 end,
                 screenDirection,
                 1.0f /
@@ -922,6 +1132,7 @@ public sealed partial class MainForm
             axes,
             anchor.Origin,
             TransformGizmoAxis.X,
+            anchor.WorldX,
             anchor.ProjectedY * radiusScale,
             anchor.ProjectedZ * radiusScale);
 
@@ -929,6 +1140,7 @@ public sealed partial class MainForm
             axes,
             anchor.Origin,
             TransformGizmoAxis.Y,
+            anchor.WorldY,
             anchor.ProjectedZ * radiusScale,
             anchor.ProjectedX * radiusScale);
 
@@ -936,6 +1148,7 @@ public sealed partial class MainForm
             axes,
             anchor.Origin,
             TransformGizmoAxis.Z,
+            anchor.WorldZ,
             anchor.ProjectedX * radiusScale,
             anchor.ProjectedY * radiusScale);
     }
@@ -944,6 +1157,7 @@ public sealed partial class MainForm
         List<TransformGizmoAxisLayout> axes,
         PointF origin,
         TransformGizmoAxis axis,
+        Vector3 worldAxis,
         Vector2 screenBasisA,
         Vector2 screenBasisB)
     {
@@ -1023,10 +1237,22 @@ public sealed partial class MainForm
                 MathF.Sin(
                     ellipseAngle));
 
+        // Covariance gives the ellipse shape but discards which side of the
+        // ring plane faces the camera. Preserve the projected basis handedness
+        // so positive rotation never reverses merely because the camera moves
+        // to the opposite side of the model.
+        float projectedHandedness =
+            screenBasisA.X * screenBasisB.Y -
+            screenBasisA.Y * screenBasisB.X;
+
         Vector2 minorDirection =
-            new(
-                -majorDirection.Y,
-                majorDirection.X);
+            projectedHandedness < 0.0f
+                ? new Vector2(
+                    majorDirection.Y,
+                    -majorDirection.X)
+                : new Vector2(
+                    -majorDirection.Y,
+                    majorDirection.X);
 
         float minorAspect =
             Math.Clamp(
@@ -1074,6 +1300,7 @@ public sealed partial class MainForm
         axes.Add(
             new TransformGizmoAxisLayout(
                 axis,
+                worldAxis,
                 points[0],
                 Vector2.Zero,
                 0.0f,
@@ -1109,6 +1336,9 @@ public sealed partial class MainForm
         _draggedTransformGizmoMode =
             _transformGizmoMode;
 
+        _draggedTransformGizmoOrientation =
+            _transformGizmoOrientation;
+
         _moveGizmoDragModel =
             model;
 
@@ -1118,17 +1348,30 @@ public sealed partial class MainForm
         _moveGizmoDragStartPosition =
             model.Position;
 
-        _moveGizmoDragStartRotationDegrees =
-            model.RotationDegrees;
+        _moveGizmoDragStartLinearTransform =
+            model.LinearTransform;
 
-        _moveGizmoDragStartScale =
-            model.Scale;
+        _moveGizmoDragWorldAxis =
+            hit.WorldAxis;
 
         _moveGizmoDragScreenDirection =
             hit.DragScreenDirection;
 
         _moveGizmoDragWorldUnitsPerPixel =
             hit.WorldUnitsPerPixel;
+
+        _rotationGizmoDragRawDeltaDegrees =
+            0.0f;
+
+        _rotationGizmoDragAppliedDeltaDegrees =
+            0.0f;
+
+        _rotationGizmoDragLastPixelDistance =
+            0.0f;
+
+        _rotationGizmoDragSnapActive =
+            (ModifierKeys & Keys.Shift) ==
+            Keys.Shift;
 
         _renderPanel.Cursor =
             Cursors.SizeAll;
@@ -1207,13 +1450,9 @@ public sealed partial class MainForm
             return false;
         }
 
-        Vector3 worldAxis =
-            GetTransformGizmoWorldAxis(
-                _draggedMoveGizmoAxis);
-
         Vector3 newPosition =
             _moveGizmoDragStartPosition +
-            worldAxis *
+            _moveGizmoDragWorldAxis *
             pixelDistance *
             _moveGizmoDragWorldUnitsPerPixel;
 
@@ -1240,32 +1479,79 @@ public sealed partial class MainForm
             return false;
         }
 
-        float deltaDegrees =
-            pixelDistance *
+        bool snapToRightAngles =
+            (ModifierKeys & Keys.Shift) ==
+            Keys.Shift;
+
+        // Rebase when Shift is pressed or released. Without this, releasing
+        // Shift jumps back to the unsnapped mouse position accumulated since
+        // the beginning of the drag.
+        if (_rotationGizmoDragSnapActive !=
+            snapToRightAngles)
+        {
+            _rotationGizmoDragRawDeltaDegrees =
+                _rotationGizmoDragAppliedDeltaDegrees;
+
+            _rotationGizmoDragSnapActive =
+                snapToRightAngles;
+        }
+
+        float incrementalPixelDistance =
+            pixelDistance -
+            _rotationGizmoDragLastPixelDistance;
+
+        _rotationGizmoDragLastPixelDistance =
+            pixelDistance;
+
+        _rotationGizmoDragRawDeltaDegrees +=
+            incrementalPixelDistance *
             RotationDegreesPerPixel;
 
-        Vector3 newRotation =
-            _moveGizmoDragStartRotationDegrees;
+        float appliedDeltaDegrees =
+            snapToRightAngles
+                ? MathF.Round(
+                    _rotationGizmoDragRawDeltaDegrees /
+                    RotationSnapDegrees,
+                    MidpointRounding.AwayFromZero) *
+                    RotationSnapDegrees
+                : _rotationGizmoDragRawDeltaDegrees;
 
-        SetVectorAxis(
-            ref newRotation,
-            _draggedMoveGizmoAxis,
-            NormalizeDegrees(
-                GetVectorAxis(
-                    _moveGizmoDragStartRotationDegrees,
-                    _draggedMoveGizmoAxis) +
-                deltaDegrees));
-
-        if (Vector3.DistanceSquared(
-                _moveGizmoDragModel.RotationDegrees,
-                newRotation) <=
-            0.0000000001f)
+        if (MathF.Abs(
+                appliedDeltaDegrees -
+                _rotationGizmoDragAppliedDeltaDegrees) <=
+            0.000001f)
         {
             return false;
         }
 
-        _moveGizmoDragModel.RotationDegrees =
-            newRotation;
+        _rotationGizmoDragAppliedDeltaDegrees =
+            appliedDeltaDegrees;
+
+        Matrix4x4 axisDelta =
+            CreateTransformGizmoAxisRotation(
+                _draggedMoveGizmoAxis,
+                appliedDeltaDegrees);
+
+        // System.Numerics composes row-vector transforms from left to right.
+        // A local delta acts before the model's existing linear transform;
+        // a global delta acts after it.
+        Matrix4x4 combinedLinearTransform =
+            _draggedTransformGizmoOrientation ==
+                TransformGizmoOrientation.Local
+                ? axisDelta *
+                  _moveGizmoDragStartLinearTransform
+                : _moveGizmoDragStartLinearTransform *
+                  axisDelta;
+
+        if (LinearTransformsNearlyEqual(
+                _moveGizmoDragModel.LinearTransform,
+                combinedLinearTransform))
+        {
+            return false;
+        }
+
+        _moveGizmoDragModel.SetLinearTransform(
+            combinedLinearTransform);
 
         return true;
     }
@@ -1279,46 +1565,86 @@ public sealed partial class MainForm
             return false;
         }
 
-        float startValue =
-            Math.Clamp(
-                GetVectorAxis(
-                    _moveGizmoDragStartScale,
-                    _draggedMoveGizmoAxis),
-                MinimumGizmoScale,
-                MaximumGizmoScale);
-
         float scaleFactor =
-            MathF.Exp(
-                pixelDistance *
-                ScaleExponentPerPixel);
-
-        float newValue =
             Math.Clamp(
-                startValue *
-                scaleFactor,
+                MathF.Exp(
+                    pixelDistance *
+                    ScaleExponentPerPixel),
                 MinimumGizmoScale,
                 MaximumGizmoScale);
 
-        Vector3 newScale =
-            _moveGizmoDragStartScale;
+        Vector3 axisScale =
+            Vector3.One;
 
-        SetVectorAxis(
-            ref newScale,
-            _draggedMoveGizmoAxis,
-            newValue);
+        if (_draggedMoveGizmoAxis ==
+            TransformGizmoAxis.Uniform)
+        {
+            axisScale =
+                new Vector3(
+                    scaleFactor);
+        }
+        else
+        {
+            SetVectorAxis(
+                ref axisScale,
+                _draggedMoveGizmoAxis,
+                scaleFactor);
+        }
 
-        if (Vector3.DistanceSquared(
-                _moveGizmoDragModel.Scale,
-                newScale) <=
-            0.0000000001f)
+        Matrix4x4 scaleDelta =
+            Matrix4x4.CreateScale(
+                axisScale);
+
+        Matrix4x4 combinedLinearTransform;
+
+        if (_draggedMoveGizmoAxis ==
+            TransformGizmoAxis.Uniform)
+        {
+            combinedLinearTransform =
+                scaleDelta *
+                _moveGizmoDragStartLinearTransform;
+        }
+        else
+        {
+            combinedLinearTransform =
+                _draggedTransformGizmoOrientation ==
+                    TransformGizmoOrientation.Local
+                    ? scaleDelta *
+                      _moveGizmoDragStartLinearTransform
+                    : _moveGizmoDragStartLinearTransform *
+                      scaleDelta;
+        }
+
+        if (LinearTransformsNearlyEqual(
+                _moveGizmoDragModel.LinearTransform,
+                combinedLinearTransform))
         {
             return false;
         }
 
-        _moveGizmoDragModel.Scale =
-            newScale;
+        _moveGizmoDragModel.SetLinearTransform(
+            combinedLinearTransform);
 
         return true;
+    }
+
+    private static bool LinearTransformsNearlyEqual(
+        Matrix4x4 first,
+        Matrix4x4 second)
+    {
+        const float tolerance =
+            0.000001f;
+
+        return
+            MathF.Abs(first.M11 - second.M11) <= tolerance &&
+            MathF.Abs(first.M12 - second.M12) <= tolerance &&
+            MathF.Abs(first.M13 - second.M13) <= tolerance &&
+            MathF.Abs(first.M21 - second.M21) <= tolerance &&
+            MathF.Abs(first.M22 - second.M22) <= tolerance &&
+            MathF.Abs(first.M23 - second.M23) <= tolerance &&
+            MathF.Abs(first.M31 - second.M31) <= tolerance &&
+            MathF.Abs(first.M32 - second.M32) <= tolerance &&
+            MathF.Abs(first.M33 - second.M33) <= tolerance;
     }
 
     private bool EndMoveGizmoDrag()
@@ -1429,6 +1755,33 @@ public sealed partial class MainForm
         bool found =
             false;
 
+        if (layout.Mode ==
+            TransformGizmoMode.Scale)
+        {
+            float uniformHitRadius =
+                UniformScaleHandleSizePixels *
+                    0.5f +
+                4.0f;
+
+            if (Distance(
+                    mouse,
+                    layout.Origin) <=
+                uniformHitRadius)
+            {
+                hit =
+                    new TransformGizmoHit(
+                        TransformGizmoAxis.Uniform,
+                        Vector3.Zero,
+                        Vector2.Normalize(
+                            new Vector2(
+                                1.0f,
+                                -1.0f)),
+                        0.0f);
+
+                return true;
+            }
+        }
+
         foreach (TransformGizmoAxisLayout axis in
                  layout.Axes)
         {
@@ -1447,6 +1800,7 @@ public sealed partial class MainForm
                 hit =
                     new TransformGizmoHit(
                         axis.Axis,
+                        axis.WorldAxis,
                         tangent,
                         0.0f);
 
@@ -1494,6 +1848,7 @@ public sealed partial class MainForm
             hit =
                 new TransformGizmoHit(
                     axis.Axis,
+                    axis.WorldAxis,
                     axis.ScreenDirection,
                     axis.WorldUnitsPerPixel);
 
@@ -1524,7 +1879,9 @@ public sealed partial class MainForm
             _moveGizmoOverlayLayout ==
                 null ||
             _moveGizmoOverlayLayout.Mode !=
-                _transformGizmoMode;
+                _transformGizmoMode ||
+            _moveGizmoOverlayLayout.Orientation !=
+                _transformGizmoOrientation;
 
         if (rebuild)
         {
@@ -1534,7 +1891,8 @@ public sealed partial class MainForm
             _moveGizmoOverlayLayout =
                 CreateTransformGizmoLayout(
                     anchor,
-                    _transformGizmoMode);
+                    _transformGizmoMode,
+                    _transformGizmoOrientation);
         }
 
         layout =
@@ -1743,6 +2101,215 @@ public sealed partial class MainForm
         }
     }
 
+    private static Matrix4x4 CreateEulerRotationMatrix(
+        Vector3 rotationDegrees)
+    {
+        const float degreesToRadians =
+            MathF.PI / 180.0f;
+
+        return
+            Matrix4x4.CreateRotationX(
+                rotationDegrees.X *
+                degreesToRadians) *
+            Matrix4x4.CreateRotationY(
+                rotationDegrees.Y *
+                degreesToRadians) *
+            Matrix4x4.CreateRotationZ(
+                rotationDegrees.Z *
+                degreesToRadians);
+    }
+
+    private static Matrix4x4 CreateTransformGizmoAxisRotation(
+        TransformGizmoAxis axis,
+        float degrees)
+    {
+        float radians =
+            degrees *
+            (MathF.PI / 180.0f);
+
+        return axis switch
+        {
+            TransformGizmoAxis.X =>
+                Matrix4x4.CreateRotationX(
+                    radians),
+
+            TransformGizmoAxis.Y =>
+                Matrix4x4.CreateRotationY(
+                    radians),
+
+            TransformGizmoAxis.Z =>
+                Matrix4x4.CreateRotationZ(
+                    radians),
+
+            _ =>
+                Matrix4x4.Identity
+        };
+    }
+
+    private static Vector3 ExtractEulerRotationDegrees(
+        Matrix4x4 rotation,
+        Vector3 referenceDegrees)
+    {
+        const float radiansToDegrees =
+            180.0f / MathF.PI;
+
+        float sinY =
+            Math.Clamp(
+                -rotation.M13,
+                -1.0f,
+                1.0f);
+
+        float y =
+            MathF.Asin(
+                sinY);
+
+        float cosY =
+            MathF.Cos(
+                y);
+
+        float x;
+        float z;
+
+        if (MathF.Abs(cosY) >
+            0.00001f)
+        {
+            x =
+                MathF.Atan2(
+                    rotation.M23,
+                    rotation.M33);
+
+            z =
+                MathF.Atan2(
+                    rotation.M12,
+                    rotation.M11);
+        }
+        else if (sinY >=
+            0.0f)
+        {
+            // At +90 degrees, only X-Z is observable. Preserve the previous Z
+            // value so the inspector does not jump needlessly at gimbal lock.
+            z =
+                referenceDegrees.Z /
+                radiansToDegrees;
+
+            float xMinusZ =
+                MathF.Atan2(
+                    rotation.M21,
+                    rotation.M22);
+
+            x =
+                xMinusZ +
+                z;
+        }
+        else
+        {
+            // At -90 degrees, only X+Z is observable. Again retain the
+            // previous Z value to keep the Euler representation continuous.
+            z =
+                referenceDegrees.Z /
+                radiansToDegrees;
+
+            float xPlusZ =
+                MathF.Atan2(
+                    -rotation.M21,
+                    rotation.M22);
+
+            x =
+                xPlusZ -
+                z;
+        }
+
+        Vector3 primary =
+            new(
+                x * radiansToDegrees,
+                y * radiansToDegrees,
+                z * radiansToDegrees);
+
+        primary =
+            UnwrapEulerNear(
+                primary,
+                referenceDegrees);
+
+        if (MathF.Abs(cosY) <=
+            0.00001f)
+        {
+            return primary;
+        }
+
+        // XYZ Euler angles have a second equivalent solution. Choose whichever
+        // representation is nearest the currently displayed inspector values.
+        Vector3 alternate =
+            new(
+                primary.X + 180.0f,
+                180.0f - primary.Y,
+                primary.Z + 180.0f);
+
+        alternate =
+            UnwrapEulerNear(
+                alternate,
+                referenceDegrees);
+
+        float primaryDistance =
+            Vector3.DistanceSquared(
+                primary,
+                referenceDegrees);
+
+        float alternateDistance =
+            Vector3.DistanceSquared(
+                alternate,
+                referenceDegrees);
+
+        return alternateDistance <
+            primaryDistance
+                ? alternate
+                : primary;
+    }
+
+    private static Vector3 UnwrapEulerNear(
+        Vector3 value,
+        Vector3 reference)
+    {
+        value.X =
+            UnwrapDegreesNear(
+                value.X,
+                reference.X);
+
+        value.Y =
+            UnwrapDegreesNear(
+                value.Y,
+                reference.Y);
+
+        value.Z =
+            UnwrapDegreesNear(
+                value.Z,
+                reference.Z);
+
+        return value;
+    }
+
+    private static float UnwrapDegreesNear(
+        float degrees,
+        float referenceDegrees)
+    {
+        while (degrees -
+               referenceDegrees >
+               180.0f)
+        {
+            degrees -=
+                360.0f;
+        }
+
+        while (degrees -
+               referenceDegrees <
+               -180.0f)
+        {
+            degrees +=
+                360.0f;
+        }
+
+        return degrees;
+    }
+
     private static float NormalizeDegrees(
         float degrees)
     {
@@ -1788,6 +2355,9 @@ public sealed partial class MainForm
                     75,
                     135,
                     245),
+
+            TransformGizmoAxis.Uniform =>
+                Color.White,
 
             _ =>
                 Color.White
