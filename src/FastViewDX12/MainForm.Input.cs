@@ -6,16 +6,39 @@ using System.Windows.Forms;
 
 namespace FastViewDX12;
 
-// Mouse, keyboard, and drag-and-drop routing for camera, light, and file interaction.
+// Mouse, keyboard, and drag-and-drop routing for camera, light, selection, and file interaction.
 public sealed partial class MainForm
 {
+    private const int ViewportClickDragThresholdPixels =
+        4;
+
+    private bool _leftViewportInteractionPending;
+
+    private bool _leftViewportOrbitStarted;
+
+    private Point _leftViewportMouseDownPosition;
+
     /// <summary>
-    /// Chooses light rotation, orbit, or pan according to the pressed mouse button and modifier keys.
+    /// Gives the move gizmo first priority. A normal left press remains a
+    /// possible selection click until the pointer moves far enough to become
+    /// an orbit drag.
     /// </summary>
     private void RenderPanel_MouseDown(
-    object? sender,
-    MouseEventArgs e)
+        object? sender,
+        MouseEventArgs e)
     {
+        if (e.Button == MouseButtons.Left &&
+            TryBeginMoveGizmoDrag(
+                e.Location))
+        {
+            ResetPendingLeftViewportInteraction();
+
+            _renderPanel.Capture =
+                true;
+
+            return;
+        }
+
         bool shiftPressed =
             (ModifierKeys & Keys.Shift) ==
             Keys.Shift;
@@ -23,43 +46,113 @@ public sealed partial class MainForm
         if (e.Button == MouseButtons.Right &&
             shiftPressed)
         {
-            _isRotatingLight = true;
+            ResetPendingLeftViewportInteraction();
+
+            _isRotatingLight =
+                true;
 
             _renderer.BeginLightRotation(
                 e.Location);
 
-            _renderPanel.Capture = true;
+            _renderPanel.Capture =
+                true;
+
             return;
         }
 
-        _isRotatingLight = false;
+        _isRotatingLight =
+            false;
 
         if (e.Button == MouseButtons.Left)
         {
-            _renderer.BeginOrbit(
-                e.Location);
+            _leftViewportMouseDownPosition =
+                e.Location;
 
-            _renderPanel.Capture = true;
+            _leftViewportInteractionPending =
+                true;
+
+            _leftViewportOrbitStarted =
+                false;
+
+            _renderPanel.Capture =
+                true;
+
+            return;
         }
-        else if (e.Button == MouseButtons.Right)
+
+        if (e.Button == MouseButtons.Right)
         {
+            ResetPendingLeftViewportInteraction();
+
             _renderer.BeginPan(
                 e.Location);
 
-            _renderPanel.Capture = true;
+            _renderPanel.Capture =
+                true;
         }
     }
 
     /// <summary>
-    /// Forwards pointer movement to the active camera or light interaction.
+    /// Starts orbiting only after a small drag threshold. This keeps a simple
+    /// left click available for model selection without causing a camera twitch.
     /// </summary>
     private void RenderPanel_MouseMove(
-     object? sender,
-     MouseEventArgs e)
+        object? sender,
+        MouseEventArgs e)
     {
+        if (UpdateMoveGizmoDrag(
+                e.Location))
+        {
+            return;
+        }
+
+        UpdateMoveGizmoHover(
+            e.Location);
+
         if (_isRotatingLight)
         {
             _renderer.OnLightMouseMove(
+                e.Location);
+
+            return;
+        }
+
+        if (_leftViewportInteractionPending &&
+            (e.Button & MouseButtons.Left) ==
+            MouseButtons.Left)
+        {
+            if (!_leftViewportOrbitStarted)
+            {
+                int deltaX =
+                    e.Location.X -
+                    _leftViewportMouseDownPosition.X;
+
+                int deltaY =
+                    e.Location.Y -
+                    _leftViewportMouseDownPosition.Y;
+
+                int thresholdSquared =
+                    ViewportClickDragThresholdPixels *
+                    ViewportClickDragThresholdPixels;
+
+                int distanceSquared =
+                    deltaX * deltaX +
+                    deltaY * deltaY;
+
+                if (distanceSquared <
+                    thresholdSquared)
+                {
+                    return;
+                }
+
+                _renderer.BeginOrbit(
+                    _leftViewportMouseDownPosition);
+
+                _leftViewportOrbitStarted =
+                    true;
+            }
+
+            _renderer.OnCameraMouseMove(
                 e.Location);
 
             return;
@@ -70,61 +163,179 @@ public sealed partial class MainForm
     }
 
     /// <summary>
-    /// Ends camera and light interactions when a mouse button is released.
+    /// A left release selects when no orbit drag began. Releasing after a drag
+    /// ends orbiting without changing the current model selection.
     /// </summary>
     private void RenderPanel_MouseUp(
-      object? sender,
-      MouseEventArgs e)
+        object? sender,
+        MouseEventArgs e)
     {
+        if (EndMoveGizmoDrag())
+        {
+            ResetPendingLeftViewportInteraction();
+
+            _renderPanel.Capture =
+                false;
+
+            return;
+        }
+
+        if (e.Button == MouseButtons.Left &&
+            _leftViewportInteractionPending)
+        {
+            bool wasOrbitDrag =
+                _leftViewportOrbitStarted;
+
+            ResetPendingLeftViewportInteraction();
+
+            if (wasOrbitDrag)
+            {
+                _renderer.EndCameraInteraction();
+            }
+            else
+            {
+                SelectSceneModelFromViewport(
+                    e.Location);
+            }
+
+            _renderPanel.Capture =
+                false;
+
+            return;
+        }
+
         if (_isRotatingLight)
         {
             _renderer.EndLightRotation();
-            _isRotatingLight = false;
+
+            _isRotatingLight =
+                false;
         }
         else
         {
             _renderer.EndCameraInteraction();
         }
 
-        _renderPanel.Capture = false;
+        _renderPanel.Capture =
+            false;
+    }
+
+    private void ResetPendingLeftViewportInteraction()
+    {
+        _leftViewportInteractionPending =
+            false;
+
+        _leftViewportOrbitStarted =
+            false;
+    }
+
+    private void RenderPanel_MouseLeave(
+        object? sender,
+        EventArgs e)
+    {
+        ClearMoveGizmoHover();
     }
 
     /// <summary>
     /// Zooms the orbit camera.
     /// </summary>
-    private void RenderPanel_MouseWheel(object? sender, MouseEventArgs e) { _renderer.OnCameraMouseWheel(e.Delta); }
+    private void RenderPanel_MouseWheel(
+        object? sender,
+        MouseEventArgs e)
+    {
+        _renderer.OnCameraMouseWheel(
+            e.Delta);
+    }
 
     /// <summary>
     /// Accepts drag-and-drop only when at least one supported model path is present.
     /// </summary>
-    private void RenderPanel_DragEnter(object? sender, DragEventArgs e)
+    private void RenderPanel_DragEnter(
+        object? sender,
+        DragEventArgs e)
     {
-        if (e.Data?.GetDataPresent(DataFormats.FileDrop) == true)
+        if (e.Data?.GetDataPresent(
+                DataFormats.FileDrop) == true)
         {
-            string[]? files = e.Data.GetData(DataFormats.FileDrop) as string[];
+            string[]? files =
+                e.Data.GetData(
+                    DataFormats.FileDrop) as string[];
 
             if (files is { Length: 1 })
             {
-                string ext = Path.GetExtension(files[0]).ToLowerInvariant();
-                if (ext == ".glb" || ext == ".gltf")
+                string extension =
+                    Path.GetExtension(
+                        files[0])
+                    .ToLowerInvariant();
+
+                if (extension == ".glb" ||
+                    extension == ".gltf")
                 {
-                    e.Effect = DragDropEffects.Copy;
+                    e.Effect =
+                        DragDropEffects.Copy;
+
                     return;
                 }
             }
         }
 
-        e.Effect = DragDropEffects.None;
+        e.Effect =
+            DragDropEffects.None;
     }
 
     /// <summary>
     /// Loads the first supported GLB or glTF file from a drop operation.
     /// </summary>
-    private void RenderPanel_DragDrop(object? sender, DragEventArgs e) { try { string[]? files = e.Data?.GetData(DataFormats.FileDrop) as string[]; if (files is not { Length: 1 }) return; LoadModelFromPath(files[0], true); } catch (Exception ex) { MessageBox.Show(this, ex.Message, "GLB load failed", MessageBoxButtons.OK, MessageBoxIcon.Error); } }
+    private void RenderPanel_DragDrop(
+        object? sender,
+        DragEventArgs e)
+    {
+        try
+        {
+            string[]? files =
+                e.Data?.GetData(
+                    DataFormats.FileDrop) as string[];
+
+            if (files is not
+                { Length: 1 })
+            {
+                return;
+            }
+
+            LoadModelFromPath(
+                files[0],
+                true);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                this,
+                ex.Message,
+                "GLB load failed",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+        }
+    }
 
     /// <summary>
-    /// Handles keyboard shortcuts such as fitting the camera to the current scene.
+    /// F frames the selected model. Without a selection it frames the complete scene.
     /// </summary>
-    private void MainForm_KeyDown(object? sender, KeyEventArgs e) { if (e.KeyCode == Keys.F) { _renderer.FitCameraToScene(); } }
+    private void MainForm_KeyDown(
+        object? sender,
+        KeyEventArgs e)
+    {
+        if (e.KeyCode !=
+            Keys.F)
+        {
+            return;
+        }
 
+        FocusSelectedModelOrScene();
+
+        e.Handled =
+            true;
+
+        e.SuppressKeyPress =
+            true;
+    }
 }

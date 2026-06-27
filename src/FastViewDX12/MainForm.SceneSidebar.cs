@@ -264,6 +264,10 @@ public sealed partial class MainForm
         {
             RefreshSceneSidebar();
         }
+        else
+        {
+            ClearMoveGizmoHover();
+        }
 
         PositionSceneSidebarToggle();
         _sceneSidebarToggleButton.BringToFront();
@@ -935,8 +939,7 @@ public sealed partial class MainForm
     /// </summary>
     private void ApplySceneModelTransform()
     {
-        RebuildRenderedScene(
-            fitCamera: false);
+        UpdateRenderedSceneGeometry();
     }
 
     private int GetSceneModelContentWidth()

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Windows.Forms;
@@ -8,6 +9,12 @@ namespace FastViewDX12;
 // Model-path validation, scene replacement, additional loading, and last-file persistence.
 public sealed partial class MainForm
 {
+    // BuildRenderScene flattens the models in document order. Remembering
+    // each source mesh count lets viewport picking map a rendered triangle
+    // back to the SceneModel that owns it.
+    private readonly Dictionary<SceneModel, int> _sourceMeshCountByModel =
+        new();
+
     /// <summary>
     /// Validates and loads a GLB or glTF file as the only model in the scene.
     /// </summary>
@@ -107,10 +114,15 @@ public sealed partial class MainForm
             }
             else
             {
+                _sourceMeshCountByModel.Clear();
+
                 _sceneDocument.ReplaceWith(
                     path,
                     loadedScene);
             }
+
+            RememberLoadedModelMeshCount(
+                loadedScene);
 
             RebuildRenderedScene();
             RefreshSceneSidebar();
@@ -154,6 +166,16 @@ public sealed partial class MainForm
     }
 
     /// <summary>
+    /// Rebuilds only mesh buffers after model transforms change. Material textures
+    /// stay resident on the GPU so interactive gizmo drags remain responsive.
+    /// </summary>
+    private void UpdateRenderedSceneGeometry()
+    {
+        _renderer.UpdateSceneGeometry(
+            _sceneDocument.BuildRenderScene());
+    }
+
+    /// <summary>
     /// Removes the currently selected model and keeps the remaining scene intact.
     /// </summary>
     private void RemoveSelectedSceneModel()
@@ -166,12 +188,32 @@ public sealed partial class MainForm
             return;
         }
 
+        _sourceMeshCountByModel.Remove(
+            selectedModel);
+
         _sceneDocument.Remove(
             selectedModel.Id);
 
         RebuildRenderedScene();
         RefreshSceneSidebar();
         UpdateWindowTitle();
+    }
+
+    private void RememberLoadedModelMeshCount(
+        SceneData loadedScene)
+    {
+        if (_sceneDocument.Models.Count == 0)
+        {
+            return;
+        }
+
+        SceneModel loadedModel =
+            _sceneDocument.Models[
+                _sceneDocument.Models.Count - 1];
+
+        _sourceMeshCountByModel[
+            loadedModel] =
+            loadedScene.Meshes.Count;
     }
 
     private void UpdateWindowTitle()

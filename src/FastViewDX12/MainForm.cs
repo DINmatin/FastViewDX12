@@ -124,6 +124,7 @@ public sealed partial class MainForm : Form
         _renderPanel.MouseMove += RenderPanel_MouseMove;
         _renderPanel.MouseUp += RenderPanel_MouseUp;
         _renderPanel.MouseWheel += RenderPanel_MouseWheel;
+        _renderPanel.MouseLeave += RenderPanel_MouseLeave;
 
         KeyPreview = true; KeyDown += MainForm_KeyDown;
 
@@ -175,6 +176,7 @@ public sealed partial class MainForm : Form
         while (AppStillIdle)
         {
             _renderer.Render();
+            UpdateMoveGizmoOverlay();
         }
     }
 
@@ -195,6 +197,8 @@ public sealed partial class MainForm : Form
     {
         if (disposing)
         {
+            DisposeMoveGizmoOverlay();
+
             Application.Idle -=
                 OnApplicationIdle;
 

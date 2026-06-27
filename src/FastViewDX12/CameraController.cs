@@ -78,7 +78,7 @@ public sealed class CameraController
     /// <summary>
     /// Fits the current camera target and distance to an axis-aligned bounding box.
     /// </summary>
-    private void FitToBounds(Vector3 min, Vector3 max)
+    public void FitToBounds(Vector3 min, Vector3 max)
     {
         _target = (min + max) * 0.5f;
 

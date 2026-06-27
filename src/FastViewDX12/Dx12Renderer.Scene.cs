@@ -731,6 +731,100 @@ public sealed partial class Dx12Renderer
     }
 
     /// <summary>
+    /// Replaces transformed mesh buffers while retaining the existing material
+    /// textures and descriptor heap. This is the lightweight path used by the
+    /// transform inspector and viewport gizmos.
+    /// </summary>
+    public void UpdateSceneGeometry(
+        SceneData scene)
+    {
+        ArgumentNullException.ThrowIfNull(
+            scene);
+
+        if (!_initialized)
+        {
+            throw new InvalidOperationException(
+                "Renderer must be initialized " +
+                "before updating scene geometry.");
+        }
+
+        bool materialsMatch =
+            _gpuMaterials.Count > 0 &&
+            scene.Materials.Count ==
+            _gpuMaterials.Count;
+
+        if (materialsMatch)
+        {
+            for (int i = 0;
+                 i < scene.Materials.Count;
+                 i++)
+            {
+                if (!ReferenceEquals(
+                    scene.Materials[i],
+                    _gpuMaterials[i].Source))
+                {
+                    materialsMatch =
+                        false;
+
+                    break;
+                }
+            }
+        }
+
+        if (!materialsMatch)
+        {
+            LoadScene(
+                scene,
+                fitCamera: false);
+
+            return;
+        }
+
+        WaitForGpu();
+        DisposeRenderItems();
+
+        _scene =
+            scene;
+
+        foreach (MeshData mesh in
+                 _scene.Meshes)
+        {
+            int materialIndex =
+                Math.Clamp(
+                    mesh.MaterialIndex,
+                    0,
+                    _gpuMaterials.Count - 1);
+
+            GpuMaterial gpuMaterial =
+                _gpuMaterials[
+                    materialIndex];
+
+            mesh.ResolvedAlphaMode =
+                ResolveAlphaMode(
+                    mesh,
+                    gpuMaterial.Source,
+                    gpuMaterial.DecodedBaseColor);
+
+            GpuRenderItem renderItem =
+                CreateRenderItem(
+                    mesh,
+                    gpuMaterial);
+
+            if (mesh.ResolvedAlphaMode ==
+                MeshAlphaMode.Blend)
+            {
+                _blendItems.Add(
+                    renderItem);
+            }
+            else
+            {
+                _opaqueItems.Add(
+                    renderItem);
+            }
+        }
+    }
+
+    /// <summary>
     /// Uses the material alpha declaration and decoded base-color alpha to choose the final render queue.
     /// </summary>
     private static MeshAlphaMode ResolveAlphaMode(
@@ -889,6 +983,23 @@ public sealed partial class Dx12Renderer
     /// </summary>
     private void DisposeSceneResources()
     {
+        DisposeRenderItems();
+
+        foreach (GpuMaterial material in
+                 _gpuMaterials)
+        {
+            material.Dispose();
+        }
+
+        _gpuMaterials.Clear();
+    }
+
+    /// <summary>
+    /// Releases only mesh and per-object constant buffers while preserving
+    /// material textures for transform-only scene updates.
+    /// </summary>
+    private void DisposeRenderItems()
+    {
         foreach (GpuRenderItem item in
                  _opaqueItems)
         {
@@ -901,15 +1012,8 @@ public sealed partial class Dx12Renderer
             item.Dispose();
         }
 
-        foreach (GpuMaterial material in
-                 _gpuMaterials)
-        {
-            material.Dispose();
-        }
-
         _opaqueItems.Clear();
         _blendItems.Clear();
-        _gpuMaterials.Clear();
     }
 
 }
