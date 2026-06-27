@@ -202,6 +202,10 @@ public sealed partial class MainForm
                 TabStop =
                     false,
 
+                Anchor =
+                    AnchorStyles.Top |
+                    AnchorStyles.Right,
+
                 AccessibleName =
                     "Show scene models"
             };
@@ -258,7 +262,7 @@ public sealed partial class MainForm
         _sceneSidebarToggleButton.Location =
             new Point(
                 x,
-                12);
+                18);
     }
 
     /// <summary>

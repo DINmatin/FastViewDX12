@@ -102,14 +102,21 @@ public sealed partial class MainForm : Form
         MainMenuStrip =
             _menuStrip;
 
-        _menuStrip.BringToFront();
-
         _renderPanel.HandleCreated += (_, _) => { _renderer.Initialize(); TryLoadDefaultEnvironmentMap(); TryLoadStartupModel(); };
         _renderPanel.Resize += (_, _) =>
         {
             _renderer.Resize();
             PositionSceneSidebarToggle();
         };
+
+        // Layout is raised during the initial form arrangement as well as when the
+        // sidebar changes the available render width. This keeps the overlay button
+        // visible before the user manually resizes the window.
+        _renderPanel.Layout +=
+            (_, _) =>
+            {
+                PositionSceneSidebarToggle();
+            };
         _renderPanel.DragEnter += RenderPanel_DragEnter;
         _renderPanel.DragDrop += RenderPanel_DragDrop;
 
@@ -119,6 +126,13 @@ public sealed partial class MainForm : Form
         _renderPanel.MouseWheel += RenderPanel_MouseWheel;
 
         KeyPreview = true; KeyDown += MainForm_KeyDown;
+
+        Shown +=
+            (_, _) =>
+            {
+                PositionSceneSidebarToggle();
+                _sceneSidebarToggleButton.BringToFront();
+            };
 
         Application.Idle += OnApplicationIdle;
     }
