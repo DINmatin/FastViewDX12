@@ -236,6 +236,7 @@ public sealed partial class MainForm
                 ToggleSceneSidebar();
             };
 
+        InitializeTransformToolbar();
         UpdateSceneSidebarCommands();
     }
 
@@ -271,6 +272,7 @@ public sealed partial class MainForm
 
         PositionSceneSidebarToggle();
         _sceneSidebarToggleButton.BringToFront();
+        _transformToolbar?.BringToFront();
     }
 
     /// <summary>
@@ -289,6 +291,8 @@ public sealed partial class MainForm
             new Point(
                 x,
                 18);
+
+        PositionTransformToolbar();
     }
 
     /// <summary>
