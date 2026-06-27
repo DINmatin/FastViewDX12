@@ -114,6 +114,7 @@ public sealed partial class MainForm
             }
             else
             {
+                ClearTransformUndoHistory();
                 _sourceMeshCountByModel.Clear();
 
                 _sceneDocument.ReplaceWith(
@@ -187,6 +188,9 @@ public sealed partial class MainForm
         {
             return;
         }
+
+        ForgetTransformUndoForModel(
+            selectedModel);
 
         _sourceMeshCountByModel.Remove(
             selectedModel);

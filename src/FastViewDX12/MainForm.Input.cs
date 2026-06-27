@@ -332,6 +332,21 @@ public sealed partial class MainForm
         object? sender,
         KeyEventArgs e)
     {
+        if (e.Control &&
+            !e.Alt &&
+            e.KeyCode == Keys.Z)
+        {
+            UndoLastTransform();
+
+            e.Handled =
+                true;
+
+            e.SuppressKeyPress =
+                true;
+
+            return;
+        }
+
         if (e.Control ||
             e.Alt)
         {

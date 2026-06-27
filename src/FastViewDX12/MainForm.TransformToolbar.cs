@@ -26,6 +26,18 @@ public sealed partial class MainForm
 
     private TransformToolbarButton? _orientationTransformButton;
 
+    private TransformToolbarButton? _frontViewButton;
+
+    private TransformToolbarButton? _rightViewButton;
+
+    private TransformToolbarButton? _leftViewButton;
+
+    private TransformToolbarButton? _topViewButton;
+
+    private TransformToolbarButton? _bottomViewButton;
+
+    private TransformToolbarButton? _backViewButton;
+
     private ToolTip? _transformToolbarToolTip;
 
     private enum TransformToolbarIcon
@@ -33,7 +45,23 @@ public sealed partial class MainForm
         Move,
         Rotate,
         Scale,
-        Orientation
+        Orientation,
+        FrontView,
+        RightView,
+        LeftView,
+        TopView,
+        BottomView,
+        BackView
+    }
+
+    private enum CameraPresetView
+    {
+        Front,
+        Right,
+        Left,
+        Top,
+        Bottom,
+        Back
     }
 
     private void InitializeTransformToolbar()
@@ -56,8 +84,9 @@ public sealed partial class MainForm
                 Size =
                     new Size(
                         TransformToolbarButtonSize,
-                        TransformToolbarButtonSize * 4 +
-                        TransformToolbarButtonGap * 3)
+                        TransformToolbarButtonSize * 10 +
+                        TransformToolbarButtonGap * 8 +
+                        10)
             };
 
         _moveTransformButton =
@@ -79,6 +108,36 @@ public sealed partial class MainForm
             CreateTransformToolbarButton(
                 TransformToolbarIcon.Orientation,
                 "Toggle Local / Global orientation (L)");
+
+        _frontViewButton =
+            CreateTransformToolbarButton(
+                TransformToolbarIcon.FrontView,
+                "Front view");
+
+        _rightViewButton =
+            CreateTransformToolbarButton(
+                TransformToolbarIcon.RightView,
+                "Right view");
+
+        _leftViewButton =
+            CreateTransformToolbarButton(
+                TransformToolbarIcon.LeftView,
+                "Left view");
+
+        _topViewButton =
+            CreateTransformToolbarButton(
+                TransformToolbarIcon.TopView,
+                "Top view");
+
+        _bottomViewButton =
+            CreateTransformToolbarButton(
+                TransformToolbarIcon.BottomView,
+                "Bottom view");
+
+        _backViewButton =
+            CreateTransformToolbarButton(
+                TransformToolbarIcon.BackView,
+                "Back view");
 
         _moveTransformButton.Click +=
             (_, _) =>
@@ -107,6 +166,48 @@ public sealed partial class MainForm
                 ToggleTransformGizmoOrientation();
             };
 
+        _frontViewButton.Click +=
+            (_, _) =>
+            {
+                ApplyCameraPresetView(
+                    CameraPresetView.Front);
+            };
+
+        _rightViewButton.Click +=
+            (_, _) =>
+            {
+                ApplyCameraPresetView(
+                    CameraPresetView.Right);
+            };
+
+        _leftViewButton.Click +=
+            (_, _) =>
+            {
+                ApplyCameraPresetView(
+                    CameraPresetView.Left);
+            };
+
+        _topViewButton.Click +=
+            (_, _) =>
+            {
+                ApplyCameraPresetView(
+                    CameraPresetView.Top);
+            };
+
+        _bottomViewButton.Click +=
+            (_, _) =>
+            {
+                ApplyCameraPresetView(
+                    CameraPresetView.Bottom);
+            };
+
+        _backViewButton.Click +=
+            (_, _) =>
+            {
+                ApplyCameraPresetView(
+                    CameraPresetView.Back);
+            };
+
         AddTransformToolbarButton(
             _moveTransformButton,
             0);
@@ -122,6 +223,36 @@ public sealed partial class MainForm
         AddTransformToolbarButton(
             _orientationTransformButton,
             3);
+
+        AddTransformToolbarButton(
+            _frontViewButton,
+            0,
+            secondGroup: true);
+
+        AddTransformToolbarButton(
+            _rightViewButton,
+            1,
+            secondGroup: true);
+
+        AddTransformToolbarButton(
+            _leftViewButton,
+            2,
+            secondGroup: true);
+
+        AddTransformToolbarButton(
+            _topViewButton,
+            3,
+            secondGroup: true);
+
+        AddTransformToolbarButton(
+            _bottomViewButton,
+            4,
+            secondGroup: true);
+
+        AddTransformToolbarButton(
+            _backViewButton,
+            5,
+            secondGroup: true);
 
         _transformToolbarToolTip =
             new ToolTip
@@ -154,6 +285,30 @@ public sealed partial class MainForm
         _transformToolbarToolTip.SetToolTip(
             _orientationTransformButton,
             "Local / Global orientation (L)");
+
+        _transformToolbarToolTip.SetToolTip(
+            _frontViewButton,
+            "Front view");
+
+        _transformToolbarToolTip.SetToolTip(
+            _rightViewButton,
+            "Right view");
+
+        _transformToolbarToolTip.SetToolTip(
+            _leftViewButton,
+            "Left view");
+
+        _transformToolbarToolTip.SetToolTip(
+            _topViewButton,
+            "Top view");
+
+        _transformToolbarToolTip.SetToolTip(
+            _bottomViewButton,
+            "Bottom view");
+
+        _transformToolbarToolTip.SetToolTip(
+            _backViewButton,
+            "Back view");
 
         _transformToolbar.Disposed +=
             (_, _) =>
@@ -196,7 +351,8 @@ public sealed partial class MainForm
 
     private void AddTransformToolbarButton(
         TransformToolbarButton button,
-        int index)
+        int index,
+        bool secondGroup = false)
     {
         if (_transformToolbar ==
             null)
@@ -204,12 +360,23 @@ public sealed partial class MainForm
             return;
         }
 
+        int y =
+            index *
+            (TransformToolbarButtonSize +
+             TransformToolbarButtonGap);
+
+        if (secondGroup)
+        {
+            y +=
+                TransformToolbarButtonSize * 4 +
+                TransformToolbarButtonGap * 4 +
+                10;
+        }
+
         button.Location =
             new Point(
                 0,
-                index *
-                (TransformToolbarButtonSize +
-                 TransformToolbarButtonGap));
+                y);
 
         _transformToolbar.Controls.Add(
             button);
@@ -271,6 +438,37 @@ public sealed partial class MainForm
     partial void TransformToolbarStateChanged()
     {
         UpdateTransformToolbarState();
+    }
+
+    private void ApplyCameraPresetView(
+        CameraPresetView preset)
+    {
+        EndMoveGizmoDrag();
+        _renderer.EndCameraInteraction();
+        _renderer.EndLightRotation();
+        _isRotatingLight = false;
+        _renderPanel.Capture = false;
+
+        (float yawDegrees, float pitchDegrees) =
+            preset switch
+            {
+                CameraPresetView.Front => (0.0f, 0.0f),
+                CameraPresetView.Right => (90.0f, 0.0f),
+                CameraPresetView.Left => (-90.0f, 0.0f),
+                CameraPresetView.Top => (0.0f, 90.0f),
+                CameraPresetView.Bottom => (0.0f, -90.0f),
+                CameraPresetView.Back => (180.0f, 0.0f),
+                _ => (0.0f, 0.0f)
+            };
+
+        _renderer.SetCameraOrbitDegrees(
+            yawDegrees,
+            pitchDegrees);
+
+        _renderer.Render();
+        UpdateMoveGizmoOverlay();
+        _moveGizmoOverlayForm?.Update();
+        _renderPanel.Focus();
     }
 
     private sealed class TransformToolbarButton : Button
@@ -437,6 +635,60 @@ public sealed partial class MainForm
                         iconPen,
                         iconBounds,
                         LocalOrientation);
+                    break;
+
+                case TransformToolbarIcon.FrontView:
+                    DrawViewIcon(
+                        graphics,
+                        iconPen,
+                        iconBrush,
+                        iconBounds,
+                        "FR");
+                    break;
+
+                case TransformToolbarIcon.RightView:
+                    DrawViewIcon(
+                        graphics,
+                        iconPen,
+                        iconBrush,
+                        iconBounds,
+                        "R");
+                    break;
+
+                case TransformToolbarIcon.LeftView:
+                    DrawViewIcon(
+                        graphics,
+                        iconPen,
+                        iconBrush,
+                        iconBounds,
+                        "L");
+                    break;
+
+                case TransformToolbarIcon.TopView:
+                    DrawViewIcon(
+                        graphics,
+                        iconPen,
+                        iconBrush,
+                        iconBounds,
+                        "T");
+                    break;
+
+                case TransformToolbarIcon.BottomView:
+                    DrawViewIcon(
+                        graphics,
+                        iconPen,
+                        iconBrush,
+                        iconBounds,
+                        "D");
+                    break;
+
+                case TransformToolbarIcon.BackView:
+                    DrawViewIcon(
+                        graphics,
+                        iconPen,
+                        iconBrush,
+                        iconBounds,
+                        "BK");
                     break;
             }
 
@@ -744,6 +996,132 @@ public sealed partial class MainForm
                 labelBrush,
                 bounds.Right - 7,
                 bounds.Bottom - 8);
+        }
+
+        private static void DrawViewIcon(
+            Graphics graphics,
+            Pen pen,
+            Brush brush,
+            Rectangle bounds,
+            string label)
+        {
+            Rectangle cubeBounds =
+                Rectangle.Inflate(
+                    bounds,
+                    -4,
+                    -4);
+
+            PointF frontTopLeft =
+                new(
+                    cubeBounds.Left + 3,
+                    cubeBounds.Top + 7);
+
+            PointF frontTopRight =
+                new(
+                    cubeBounds.Right - 9,
+                    cubeBounds.Top + 7);
+
+            PointF frontBottomRight =
+                new(
+                    cubeBounds.Right - 9,
+                    cubeBounds.Bottom - 5);
+
+            PointF frontBottomLeft =
+                new(
+                    cubeBounds.Left + 3,
+                    cubeBounds.Bottom - 5);
+
+            PointF depth =
+                new(
+                    6.0f,
+                    -4.0f);
+
+            PointF backTopLeft =
+                new(
+                    frontTopLeft.X + depth.X,
+                    frontTopLeft.Y + depth.Y);
+
+            PointF backTopRight =
+                new(
+                    frontTopRight.X + depth.X,
+                    frontTopRight.Y + depth.Y);
+
+            PointF backBottomRight =
+                new(
+                    frontBottomRight.X + depth.X,
+                    frontBottomRight.Y + depth.Y);
+
+            graphics.DrawPolygon(
+                pen,
+                [
+                    frontTopLeft,
+                    frontTopRight,
+                    frontBottomRight,
+                    frontBottomLeft
+                ]);
+
+            graphics.DrawPolygon(
+                pen,
+                [
+                    backTopLeft,
+                    backTopRight,
+                    backBottomRight,
+                    new PointF(
+                        frontBottomLeft.X + depth.X,
+                        frontBottomLeft.Y + depth.Y)
+                ]);
+
+            graphics.DrawLine(
+                pen,
+                frontTopLeft,
+                backTopLeft);
+
+            graphics.DrawLine(
+                pen,
+                frontTopRight,
+                backTopRight);
+
+            graphics.DrawLine(
+                pen,
+                frontBottomRight,
+                backBottomRight);
+
+            Font baseFont =
+                SystemFonts.MessageBoxFont ??
+                Control.DefaultFont;
+
+            using var labelFont =
+                new Font(
+                    baseFont.FontFamily,
+                    label.Length > 1
+                        ? 6.0f
+                        : 8.0f,
+                    FontStyle.Bold,
+                    GraphicsUnit.Point);
+
+            using var labelBrush =
+                new SolidBrush(
+                    pen.Color);
+
+            SizeF labelSize =
+                graphics.MeasureString(
+                    label,
+                    labelFont);
+
+            float labelX =
+                frontTopLeft.X +
+                ((frontTopRight.X - frontTopLeft.X) - labelSize.Width) * 0.5f;
+
+            float labelY =
+                frontTopLeft.Y +
+                ((frontBottomLeft.Y - frontTopLeft.Y) - labelSize.Height) * 0.5f - 0.5f;
+
+            graphics.DrawString(
+                label,
+                labelFont,
+                labelBrush,
+                labelX,
+                labelY);
         }
 
         private static void DrawArrowHead(

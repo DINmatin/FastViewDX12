@@ -1322,6 +1322,10 @@ public sealed partial class MainForm
             return false;
         }
 
+        BeginTransformUndo(
+            model,
+            $"{_transformGizmoMode} model");
+
         _renderer.EndCameraInteraction();
         _renderer.EndLightRotation();
         _isRotatingLight =
@@ -1654,6 +1658,8 @@ public sealed partial class MainForm
         {
             return false;
         }
+
+        CommitTransformUndo();
 
         _draggedMoveGizmoAxis =
             TransformGizmoAxis.None;

@@ -35,6 +35,11 @@ public sealed partial class MainForm
     /// </summary>
     private void InitializeSceneSidebar()
     {
+        // Keep application shortcuts such as Ctrl+Z available even while a
+        // NumericUpDown editor or toolbar button owns keyboard focus.
+        KeyPreview =
+            true;
+
         _sceneModelList =
             new FlowLayoutPanel
             {
@@ -612,6 +617,10 @@ public sealed partial class MainForm
         resetButton.Click +=
             (_, _) =>
             {
+                BeginTransformUndo(
+                    model,
+                    "Reset transform");
+
                 model.Position =
                     Vector3.Zero;
 
@@ -622,6 +631,7 @@ public sealed partial class MainForm
                     Vector3.One;
 
                 ApplySceneModelTransform();
+                CommitTransformUndo();
                 RefreshSceneSidebar();
             };
 
@@ -851,6 +861,10 @@ public sealed partial class MainForm
         resetRowButton.Click +=
             (_, _) =>
             {
+                BeginTransformUndo(
+                    model,
+                    $"Reset {labelText}");
+
                 switch (kind)
                 {
                     case TransformVectorKind.Position:
@@ -870,6 +884,7 @@ public sealed partial class MainForm
                 }
 
                 ApplySceneModelTransform();
+                CommitTransformUndo();
                 RefreshSceneSidebar();
             };
 
@@ -913,6 +928,40 @@ public sealed partial class MainForm
 
             ApplySceneModelTransform();
         }
+
+        void BeginEditorUndo(
+            object? sender,
+            EventArgs eventArgs)
+        {
+            BeginTransformUndo(
+                model,
+                $"Edit {labelText}");
+        }
+
+        void CommitEditorUndo(
+            object? sender,
+            EventArgs eventArgs)
+        {
+            CommitTransformUndo();
+        }
+
+        xEditor.Enter +=
+            BeginEditorUndo;
+
+        yEditor.Enter +=
+            BeginEditorUndo;
+
+        zEditor.Enter +=
+            BeginEditorUndo;
+
+        xEditor.Leave +=
+            CommitEditorUndo;
+
+        yEditor.Leave +=
+            CommitEditorUndo;
+
+        zEditor.Leave +=
+            CommitEditorUndo;
 
         xEditor.ValueChanged +=
             HandleValueChanged;
