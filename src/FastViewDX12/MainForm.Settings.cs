@@ -12,7 +12,7 @@ namespace FastViewDX12;
 public sealed partial class MainForm
 {
     private const int ViewerSettingsVersion =
-        1;
+        2;
 
     private const int ViewerSettingsPollMilliseconds =
         250;
@@ -76,7 +76,8 @@ public sealed partial class MainForm
 
         public int TransformMode { get; set; }
 
-        public int TransformOrientation { get; set; }
+        public int TransformOrientation { get; set; } =
+            (int)TransformGizmoOrientation.Local;
 
         public bool HasCameraView { get; set; }
 
@@ -135,6 +136,17 @@ public sealed partial class MainForm
 
     private void NormalizeViewerSettings()
     {
+        int loadedVersion =
+            _viewerSettings.Version;
+
+        // Version 2 changes the editor default from Global to Local. Existing
+        // version-1 settings are migrated once; later user choices still persist.
+        if (loadedVersion < 2)
+        {
+            _viewerSettings.TransformOrientation =
+                (int)TransformGizmoOrientation.Local;
+        }
+
         _viewerSettings.Version =
             ViewerSettingsVersion;
 

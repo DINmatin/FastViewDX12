@@ -93,6 +93,16 @@ public sealed partial class MainForm
             _viewerSettings.BackgroundMode ==
             ViewerBackgroundMode.Environment;
 
+        bool builtInEnvironmentSelected =
+            environmentBackgroundSelected &&
+            string.IsNullOrWhiteSpace(
+                _viewerSettings.EnvironmentMapPath);
+
+        bool customEnvironmentSelected =
+            environmentBackgroundSelected &&
+            !string.IsNullOrWhiteSpace(
+                _viewerSettings.EnvironmentMapPath);
+
         var solidBackgroundItem =
             new ToolStripMenuItem(
                 "Solid color...")
@@ -101,19 +111,27 @@ public sealed partial class MainForm
                     !environmentBackgroundSelected
             };
 
-        string environmentMenuText =
-            string.IsNullOrWhiteSpace(
-                _viewerSettings.EnvironmentMapPath)
-                ? "EXR environment..."
-                : $"EXR environment... " +
-                  $"({Path.GetFileName(_viewerSettings.EnvironmentMapPath)})";
-
-        var environmentBackgroundItem =
+        var builtInEnvironmentBackgroundItem =
             new ToolStripMenuItem(
-                environmentMenuText)
+                "Built-in EXR")
             {
                 Checked =
-                    environmentBackgroundSelected
+                    builtInEnvironmentSelected
+            };
+
+        string customEnvironmentMenuText =
+            string.IsNullOrWhiteSpace(
+                _viewerSettings.EnvironmentMapPath)
+                ? "EXR file..."
+                : $"EXR file... " +
+                  $"({Path.GetFileName(_viewerSettings.EnvironmentMapPath)})";
+
+        var customEnvironmentBackgroundItem =
+            new ToolStripMenuItem(
+                customEnvironmentMenuText)
+            {
+                Checked =
+                    customEnvironmentSelected
             };
 
         int savedBackgroundOpacityPercent =
@@ -217,7 +235,10 @@ public sealed partial class MainForm
                 solidBackgroundItem.Checked =
                     true;
 
-                environmentBackgroundItem.Checked =
+                builtInEnvironmentBackgroundItem.Checked =
+                    false;
+
+                customEnvironmentBackgroundItem.Checked =
                     false;
 
                 backgroundOpacityLabel.Enabled =
@@ -230,7 +251,73 @@ public sealed partial class MainForm
                     false;
             };
 
-        environmentBackgroundItem.Click +=
+        builtInEnvironmentBackgroundItem.Click +=
+            (_, _) =>
+            {
+                if (!File.Exists(
+                        DefaultEnvironmentMapPath))
+                {
+                    MessageBox.Show(
+                        this,
+                        $"Built-in EXR was not found:\n{DefaultEnvironmentMapPath}",
+                        "Built-in EXR could not be loaded",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Error);
+
+                    return;
+                }
+
+                try
+                {
+                    _renderer.LoadEnvironmentMap(
+                        DefaultEnvironmentMapPath);
+
+                    _renderer.SetBackgroundMode(
+                        ViewerBackgroundMode.Environment);
+
+                    // Null means the bundled EXR. A non-null path is reserved
+                    // for a user-selected external environment image.
+                    _viewerSettings.EnvironmentMapPath =
+                        null;
+
+                    _viewerSettings.BackgroundMode =
+                        ViewerBackgroundMode.Environment;
+
+                    ScheduleViewerSettingsSave();
+
+                    solidBackgroundItem.Checked =
+                        false;
+
+                    builtInEnvironmentBackgroundItem.Checked =
+                        true;
+
+                    customEnvironmentBackgroundItem.Checked =
+                        false;
+
+                    customEnvironmentBackgroundItem.Text =
+                        "EXR file...";
+
+                    backgroundOpacityLabel.Enabled =
+                        true;
+
+                    backgroundOpacitySlider.Enabled =
+                        true;
+
+                    backgroundOpacitySliderHost.Enabled =
+                        true;
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(
+                        this,
+                        ex.Message,
+                        "Built-in EXR could not be loaded",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Error);
+                }
+            };
+
+        customEnvironmentBackgroundItem.Click +=
             (_, _) =>
             {
                 using var dialog =
@@ -277,11 +364,14 @@ public sealed partial class MainForm
                     solidBackgroundItem.Checked =
                         false;
 
-                    environmentBackgroundItem.Checked =
+                    builtInEnvironmentBackgroundItem.Checked =
+                        false;
+
+                    customEnvironmentBackgroundItem.Checked =
                         true;
 
-                    environmentBackgroundItem.Text =
-                        $"EXR environment... ({Path.GetFileName(dialog.FileName)})";
+                    customEnvironmentBackgroundItem.Text =
+                        $"EXR file... ({Path.GetFileName(dialog.FileName)})";
 
                     backgroundOpacityLabel.Enabled =
                         true;
@@ -327,7 +417,10 @@ public sealed partial class MainForm
             solidBackgroundItem);
 
         backgroundMenu.DropDownItems.Add(
-            environmentBackgroundItem);
+            builtInEnvironmentBackgroundItem);
+
+        backgroundMenu.DropDownItems.Add(
+            customEnvironmentBackgroundItem);
 
         backgroundMenu.DropDownItems.Add(
             new ToolStripSeparator());

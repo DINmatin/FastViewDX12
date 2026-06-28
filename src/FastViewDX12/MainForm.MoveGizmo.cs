@@ -55,10 +55,10 @@ public sealed partial class MainForm
         TransformGizmoMode.Move;
 
     private TransformGizmoOrientation _transformGizmoOrientation =
-        TransformGizmoOrientation.Global;
+        TransformGizmoOrientation.Local;
 
     private TransformGizmoOrientation _draggedTransformGizmoOrientation =
-        TransformGizmoOrientation.Global;
+        TransformGizmoOrientation.Local;
 
     private TransformGizmoAxis _hoveredMoveGizmoAxis;
 
@@ -105,7 +105,7 @@ public sealed partial class MainForm
         TransformGizmoMode.Move;
 
     private TransformGizmoOrientation _paintedTransformGizmoOrientation =
-        TransformGizmoOrientation.Global;
+        TransformGizmoOrientation.Local;
 
     private enum TransformGizmoMode
     {
