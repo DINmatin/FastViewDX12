@@ -89,28 +89,47 @@ public sealed partial class MainForm
             new ToolStripMenuItem(
                 "Background");
 
+        bool environmentBackgroundSelected =
+            _viewerSettings.BackgroundMode ==
+            ViewerBackgroundMode.Environment;
+
         var solidBackgroundItem =
             new ToolStripMenuItem(
                 "Solid color...")
             {
                 Checked =
-                    true
+                    !environmentBackgroundSelected
             };
+
+        string environmentMenuText =
+            string.IsNullOrWhiteSpace(
+                _viewerSettings.EnvironmentMapPath)
+                ? "EXR environment..."
+                : $"EXR environment... " +
+                  $"({Path.GetFileName(_viewerSettings.EnvironmentMapPath)})";
 
         var environmentBackgroundItem =
             new ToolStripMenuItem(
-                "EXR environment...")
+                environmentMenuText)
             {
                 Checked =
-                    false
+                    environmentBackgroundSelected
             };
+
+        int savedBackgroundOpacityPercent =
+            Math.Clamp(
+                (int)MathF.Round(
+                    _viewerSettings.EnvironmentBackgroundOpacity *
+                    100.0f),
+                0,
+                100);
 
         var backgroundOpacityLabel =
             new ToolStripLabel(
-                "EXR opacity: 100%")
+                $"EXR opacity: {savedBackgroundOpacityPercent}%")
             {
                 Enabled =
-                    false
+                    environmentBackgroundSelected
             };
 
         var backgroundOpacitySlider =
@@ -123,7 +142,7 @@ public sealed partial class MainForm
                     100,
 
                 Value =
-                    100,
+                    savedBackgroundOpacityPercent,
 
                 SmallChange =
                     5,
@@ -149,7 +168,7 @@ public sealed partial class MainForm
                     false,
 
                 Enabled =
-                    false
+                    environmentBackgroundSelected
             };
 
         ToolStripControlHost backgroundOpacitySliderHost =
@@ -157,7 +176,7 @@ public sealed partial class MainForm
                 backgroundOpacitySlider);
 
         backgroundOpacitySliderHost.Enabled =
-            false;
+            environmentBackgroundSelected;
 
         solidBackgroundItem.Click +=
             (_, _) =>
@@ -186,6 +205,14 @@ public sealed partial class MainForm
 
                 _renderer.SetBackgroundMode(
                     ViewerBackgroundMode.SolidColor);
+
+                _viewerSettings.BackgroundColorArgb =
+                    dialog.Color.ToArgb();
+
+                _viewerSettings.BackgroundMode =
+                    ViewerBackgroundMode.SolidColor;
+
+                ScheduleViewerSettingsSave();
 
                 solidBackgroundItem.Checked =
                     true;
@@ -239,6 +266,14 @@ public sealed partial class MainForm
                     _renderer.SetBackgroundMode(
                         ViewerBackgroundMode.Environment);
 
+                    _viewerSettings.EnvironmentMapPath =
+                        dialog.FileName;
+
+                    _viewerSettings.BackgroundMode =
+                        ViewerBackgroundMode.Environment;
+
+                    ScheduleViewerSettingsSave();
+
                     solidBackgroundItem.Checked =
                         false;
 
@@ -281,6 +316,11 @@ public sealed partial class MainForm
 
                 _renderer.SetEnvironmentBackgroundOpacity(
                     opacity);
+
+                _viewerSettings.EnvironmentBackgroundOpacity =
+                    opacity;
+
+                ScheduleViewerSettingsSave();
             };
 
         backgroundMenu.DropDownItems.Add(
@@ -306,7 +346,7 @@ public sealed partial class MainForm
                     true,
 
                 Checked =
-                    true
+                    _viewerSettings.EnvironmentLightingEnabled
             };
 
         environmentEnabledItem.CheckedChanged +=
@@ -315,6 +355,11 @@ public sealed partial class MainForm
                 _renderer
                     .SetEnvironmentLightingEnabled(
                         environmentEnabledItem.Checked);
+
+                _viewerSettings.EnvironmentLightingEnabled =
+                    environmentEnabledItem.Checked;
+
+                ScheduleViewerSettingsSave();
             };
 
         var directLightEnabledItem =
@@ -325,7 +370,7 @@ public sealed partial class MainForm
                     true,
 
                 Checked =
-                    true
+                    _viewerSettings.DirectLightEnabled
             };
 
         directLightEnabledItem.CheckedChanged +=
@@ -334,14 +379,31 @@ public sealed partial class MainForm
                 _renderer
                     .SetDirectLightEnabled(
                         directLightEnabledItem.Checked);
+
+                _viewerSettings.DirectLightEnabled =
+                    directLightEnabledItem.Checked;
+
+                ScheduleViewerSettingsSave();
             };
+
+        int savedEnvironmentIntensityPercent =
+            Math.Clamp(
+                (int)MathF.Round(
+                    _viewerSettings.EnvironmentIntensity *
+                    100.0f),
+                0,
+                300);
 
         var environmentIntensityLabel =
             new ToolStripLabel(
-                "Environment intensity: 100%");
+                $"Environment intensity: " +
+                $"{savedEnvironmentIntensityPercent}%");
 
         TrackBar environmentIntensitySlider =
             CreateIntensitySlider();
+
+        environmentIntensitySlider.Value =
+            savedEnvironmentIntensityPercent;
 
         environmentIntensitySlider.ValueChanged +=
             (_, _) =>
@@ -356,18 +418,35 @@ public sealed partial class MainForm
 
                 _renderer.SetEnvironmentIntensity(
                     intensity);
+
+                _viewerSettings.EnvironmentIntensity =
+                    intensity;
+
+                ScheduleViewerSettingsSave();
             };
 
         var environmentSliderHost =
             CreateSliderHost(
                 environmentIntensitySlider);
 
+        int savedDirectLightIntensityPercent =
+            Math.Clamp(
+                (int)MathF.Round(
+                    _viewerSettings.DirectLightIntensity *
+                    100.0f),
+                0,
+                300);
+
         var directLightIntensityLabel =
             new ToolStripLabel(
-                "Direct light intensity: 100%");
+                $"Direct light intensity: " +
+                $"{savedDirectLightIntensityPercent}%");
 
         TrackBar directLightIntensitySlider =
             CreateIntensitySlider();
+
+        directLightIntensitySlider.Value =
+            savedDirectLightIntensityPercent;
 
         directLightIntensitySlider.ValueChanged +=
             (_, _) =>
@@ -382,6 +461,11 @@ public sealed partial class MainForm
 
                 _renderer.SetDirectLightIntensity(
                     intensity);
+
+                _viewerSettings.DirectLightIntensity =
+                    intensity;
+
+                ScheduleViewerSettingsSave();
             };
 
         var directLightSliderHost =

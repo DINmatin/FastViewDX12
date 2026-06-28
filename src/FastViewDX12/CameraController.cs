@@ -158,6 +158,64 @@ public sealed class CameraController
     }
 
     /// <summary>
+    /// Returns the complete orbit-camera state used by persistent viewer settings.
+    /// </summary>
+    public void GetState(
+        out Vector3 target,
+        out float distance,
+        out float yawRadians,
+        out float pitchRadians)
+    {
+        target =
+            _target;
+
+        distance =
+            _distance;
+
+        yawRadians =
+            _yaw;
+
+        pitchRadians =
+            _pitch;
+    }
+
+    /// <summary>
+    /// Restores a previously saved orbit-camera state.
+    /// </summary>
+    public void SetState(
+        Vector3 target,
+        float distance,
+        float yawRadians,
+        float pitchRadians)
+    {
+        if (!float.IsFinite(target.X) ||
+            !float.IsFinite(target.Y) ||
+            !float.IsFinite(target.Z) ||
+            !float.IsFinite(distance) ||
+            !float.IsFinite(yawRadians) ||
+            !float.IsFinite(pitchRadians))
+        {
+            return;
+        }
+
+        _target =
+            target;
+
+        _distance =
+            Math.Clamp(
+                distance,
+                0.05f,
+                100000.0f);
+
+        SetOrbitAngles(
+            yawRadians,
+            pitchRadians);
+
+        _orbitSnapActive =
+            false;
+    }
+
+    /// <summary>
     /// Returns normalized forward, right, and up vectors for the current orbit camera.
     /// </summary>
     public void GetViewBasis(

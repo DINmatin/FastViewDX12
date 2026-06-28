@@ -40,6 +40,8 @@ public sealed partial class MainForm : Form
     /// <param name="startupModelPath">Optional model path supplied on the command line.</param>
     public MainForm(string? startupModelPath = null)
     {
+        LoadViewerSettings();
+
         Text = "FastViewDX12";
         ClientSize = new Size(1600, 900);
         StartPosition = FormStartPosition.CenterScreen;
@@ -60,10 +62,8 @@ public sealed partial class MainForm : Form
         _renderPanel = new Panel
         {
             Dock = DockStyle.Fill,
-            BackColor = Color.FromArgb(
-                20,
-                20,
-                26),
+            BackColor =
+                GetConfiguredBackgroundColor(),
 
             AllowDrop = true
         };
@@ -102,7 +102,16 @@ public sealed partial class MainForm : Form
         MainMenuStrip =
             _menuStrip;
 
-        _renderPanel.HandleCreated += (_, _) => { _renderer.Initialize(); TryLoadDefaultEnvironmentMap(); TryLoadStartupModel(); };
+        _renderPanel.HandleCreated +=
+            (_, _) =>
+            {
+                _renderer.Initialize();
+                TryLoadConfiguredEnvironmentMap();
+                ApplyViewerSettingsToRenderer();
+                TryLoadStartupModel();
+                ApplySavedCameraView();
+                BeginViewerSettingsTracking();
+            };
         _renderPanel.Resize += (_, _) =>
         {
             _renderer.Resize();
@@ -139,17 +148,24 @@ public sealed partial class MainForm : Form
     }
 
     /// <summary>
-    /// Loads the bundled EXR environment map when it is available and leaves the fallback environment active otherwise.
+    /// Loads the configured EXR environment map when available, otherwise the
+    /// bundled default map. The renderer fallback remains active if both fail.
     /// </summary>
-    private void TryLoadDefaultEnvironmentMap()
+    private void TryLoadConfiguredEnvironmentMap()
     {
+        string? configuredPath =
+            _viewerSettings.EnvironmentMapPath;
+
         string path =
-            DefaultEnvironmentMapPath;
+            !string.IsNullOrWhiteSpace(configuredPath) &&
+            File.Exists(configuredPath)
+                ? configuredPath
+                : DefaultEnvironmentMapPath;
 
         if (!File.Exists(path))
         {
             Debug.WriteLine(
-                $"Default environment map not found: {path}");
+                $"Environment map not found: {path}");
 
             return;
         }
@@ -159,12 +175,12 @@ public sealed partial class MainForm : Form
             _renderer.LoadEnvironmentMap(path);
 
             Debug.WriteLine(
-                $"Default environment map loaded: {path}");
+                $"Environment map loaded: {path}");
         }
         catch (Exception ex)
         {
             Debug.WriteLine(
-                $"Could not load default environment map: {ex}");
+                $"Could not load environment map: {ex}");
         }
     }
 
@@ -177,6 +193,7 @@ public sealed partial class MainForm : Form
         {
             _renderer.Render();
             UpdateMoveGizmoOverlay();
+            PollViewerSettingsChanges();
         }
     }
 
@@ -197,6 +214,7 @@ public sealed partial class MainForm : Form
     {
         if (disposing)
         {
+            SaveViewerSettingsNow();
             DisposeMoveGizmoOverlay();
 
             Application.Idle -=

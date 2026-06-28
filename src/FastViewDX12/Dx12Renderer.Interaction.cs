@@ -141,6 +141,38 @@ public sealed partial class Dx12Renderer
     }
 
     /// <summary>
+    /// Returns the complete camera state for viewer-settings persistence.
+    /// </summary>
+    public void GetCameraViewState(
+        out System.Numerics.Vector3 target,
+        out float distance,
+        out float yawRadians,
+        out float pitchRadians)
+    {
+        _camera.GetState(
+            out target,
+            out distance,
+            out yawRadians,
+            out pitchRadians);
+    }
+
+    /// <summary>
+    /// Restores a complete camera state without changing perspective projection.
+    /// </summary>
+    public void SetCameraViewState(
+        System.Numerics.Vector3 target,
+        float distance,
+        float yawRadians,
+        float pitchRadians)
+    {
+        _camera.SetState(
+            target,
+            distance,
+            yawRadians,
+            pitchRadians);
+    }
+
+    /// <summary>
     /// Sets the camera yaw and pitch without changing the fitted target or distance.
     /// </summary>
     /// <param name="yawDegrees">Horizontal orbit angle in degrees.</param>
