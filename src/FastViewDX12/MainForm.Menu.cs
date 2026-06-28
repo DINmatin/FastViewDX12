@@ -63,6 +63,16 @@ public sealed partial class MainForm
                     addToScene: true);
             };
 
+        var exportSceneItem =
+            new ToolStripMenuItem(
+                "Export scene as...");
+
+        exportSceneItem.Click +=
+            (_, _) =>
+            {
+                ExportSceneAsGlb();
+            };
+
         var exportPreviewItem =
             new ToolStripMenuItem(
                 "Export preview PNG...");
@@ -83,7 +93,18 @@ public sealed partial class MainForm
             new ToolStripSeparator());
 
         fileMenu.DropDownItems.Add(
+            exportSceneItem);
+
+        fileMenu.DropDownItems.Add(
             exportPreviewItem);
+
+        fileMenu.DropDownOpening +=
+            (_, _) =>
+            {
+                exportSceneItem.Enabled =
+                    _sceneDocument.Models.Count >
+                    0;
+            };
 
         var viewMenu =
             new ToolStripMenuItem(
@@ -1204,6 +1225,123 @@ public sealed partial class MainForm
                     8,
                     4)
         };
+    }
+
+    /// <summary>
+    /// Exports the editable scene as one self-contained GLB. Model transforms
+    /// are baked into the exported geometry; editor grid, gizmos, background,
+    /// camera, and post-processing remain viewport-only.
+    /// </summary>
+    private void ExportSceneAsGlb()
+    {
+        if (_sceneDocument.Models.Count ==
+            0)
+        {
+            MessageBox.Show(
+                this,
+                "There is no scene to export.",
+                "Export scene",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+
+            return;
+        }
+
+        using var dialog =
+            new SaveFileDialog
+            {
+                Title =
+                    "Export FastView scene as GLB",
+
+                Filter =
+                    "GLB scene (*.glb)|*.glb",
+
+                DefaultExt =
+                    "glb",
+
+                AddExtension =
+                    true,
+
+                OverwritePrompt =
+                    true,
+
+                RestoreDirectory =
+                    true,
+
+                FileName =
+                    CreateDefaultSceneExportFileName()
+            };
+
+        if (dialog.ShowDialog(this) !=
+            DialogResult.OK)
+        {
+            return;
+        }
+
+        try
+        {
+            UseWaitCursor =
+                true;
+
+            SceneData exportScene =
+                _sceneDocument.BuildRenderScene();
+
+            GltfSceneExporter.ExportGlb(
+                exportScene,
+                dialog.FileName);
+
+            MessageBox.Show(
+                this,
+                $"Scene exported successfully.\n\n{dialog.FileName}",
+                "Export scene",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine(
+                $"Scene export failed: {ex}");
+
+            MessageBox.Show(
+                this,
+                ex.Message,
+                "Scene export failed",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+        }
+        finally
+        {
+            UseWaitCursor =
+                false;
+        }
+    }
+
+    private string CreateDefaultSceneExportFileName()
+    {
+        string baseName =
+            _sceneDocument.Models.Count ==
+            1
+                ? _sceneDocument.Models[0].Name
+                : "FastViewScene";
+
+        foreach (char invalidCharacter in
+                 Path.GetInvalidFileNameChars())
+        {
+            baseName =
+                baseName.Replace(
+                    invalidCharacter,
+                    '_');
+        }
+
+        if (string.IsNullOrWhiteSpace(
+                baseName))
+        {
+            baseName =
+                "FastViewScene";
+        }
+
+        return
+            $"{baseName}_scene.glb";
     }
 
     /// <summary>
