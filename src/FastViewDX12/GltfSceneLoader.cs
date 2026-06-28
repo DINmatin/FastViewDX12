@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Numerics;
+using System.Text.Json;
 
 namespace FastViewDX12;
 
@@ -47,6 +48,11 @@ public static class GltfSceneLoader
         var result = new SceneData();
         var materialIndices = new Dictionary<Material, int>();
 
+        Dictionary<Material, float> emissiveStrengths =
+            ReadEmissiveStrengths(
+                model,
+                path);
+
         int defaultMaterialIndex = -1;
 
         foreach (Node rootNode in scene.VisualChildren)
@@ -55,6 +61,7 @@ public static class GltfSceneLoader
                 rootNode,
                 result,
                 materialIndices,
+                emissiveStrengths,
                 ref defaultMaterialIndex);
         }
 
@@ -74,6 +81,7 @@ public static class GltfSceneLoader
         Node node,
         SceneData sceneData,
         Dictionary<Material, int> materialIndices,
+        Dictionary<Material, float> emissiveStrengths,
         ref int defaultMaterialIndex)
     {
         if (node.Mesh != null)
@@ -82,6 +90,7 @@ public static class GltfSceneLoader
                 node,
                 sceneData,
                 materialIndices,
+                emissiveStrengths,
                 ref defaultMaterialIndex);
         }
 
@@ -91,6 +100,7 @@ public static class GltfSceneLoader
                 child,
                 sceneData,
                 materialIndices,
+                emissiveStrengths,
                 ref defaultMaterialIndex);
         }
     }
@@ -102,6 +112,7 @@ public static class GltfSceneLoader
         Node node,
         SceneData sceneData,
         Dictionary<Material, int> materialIndices,
+        Dictionary<Material, float> emissiveStrengths,
         ref int defaultMaterialIndex)
     {
         Matrix4x4 world = node.WorldMatrix;
@@ -166,6 +177,7 @@ public static class GltfSceneLoader
                     primitive.Material,
                     sceneData,
                     materialIndices,
+                    emissiveStrengths,
                     ref defaultMaterialIndex);
 
             MaterialData material =
@@ -234,6 +246,7 @@ public static class GltfSceneLoader
         Material? material,
         SceneData sceneData,
         Dictionary<Material, int> materialIndices,
+        Dictionary<Material, float> emissiveStrengths,
         ref int defaultMaterialIndex)
     {
         if (material == null)
@@ -260,8 +273,17 @@ public static class GltfSceneLoader
         int newIndex =
             sceneData.Materials.Count;
 
+        float emissiveStrength =
+            emissiveStrengths.TryGetValue(
+                material,
+                out float storedEmissiveStrength)
+                ? storedEmissiveStrength
+                : 1.0f;
+
         sceneData.Materials.Add(
-            ReadMaterial(material));
+            ReadMaterial(
+                material,
+                emissiveStrength));
 
         materialIndices.Add(
             material,
@@ -285,7 +307,8 @@ public static class GltfSceneLoader
     /// Extracts PBR factors, alpha settings, flags, and supported image channels from a glTF material.
     /// </summary>
     private static MaterialData ReadMaterial(
-        Material material)
+        Material material,
+        float emissiveStrength)
     {
         var result =
             new MaterialData
@@ -400,8 +423,15 @@ public static class GltfSceneLoader
 
         if (emissiveChannel.HasValue)
         {
-            result.EmissiveFactor =
+            Vector4 emissiveFactor =
                 emissiveChannel.Value.Color;
+
+            result.EmissiveFactor =
+                new Vector4(
+                    emissiveFactor.X * emissiveStrength,
+                    emissiveFactor.Y * emissiveStrength,
+                    emissiveFactor.Z * emissiveStrength,
+                    emissiveFactor.W);
 
             result.EmissiveTextureBytes =
                 ReadChannelTexture(
@@ -417,9 +447,193 @@ public static class GltfSceneLoader
             $"normal={result.NormalTextureBytes?.Length ?? 0} bytes, " +
             $"metallicRoughness={result.MetallicRoughnessTextureBytes?.Length ?? 0} bytes, " +
             $"transmission={result.TransmissionFactor:0.###}, " +
+            $"emissiveStrength={emissiveStrength:0.###}, " +
             $"emissive={result.EmissiveTextureBytes?.Length ?? 0} bytes");
 
         return result;
+    }
+
+    /// <summary>
+    /// Reads KHR_materials_emissive_strength directly from the source JSON and
+    /// associates each multiplier with SharpGLTF's logical material object.
+    /// SharpGLTF.Core exposes the standard emissive channel but not this
+    /// extension through MaterialChannel.
+    /// </summary>
+    private static Dictionary<Material, float> ReadEmissiveStrengths(
+        ModelRoot model,
+        string path)
+    {
+        var result =
+            new Dictionary<Material, float>();
+
+        try
+        {
+            float[] strengths =
+                ReadEmissiveStrengthValues(
+                    path);
+
+            int materialCount =
+                Math.Min(
+                    model.LogicalMaterials.Count,
+                    strengths.Length);
+
+            for (int index = 0;
+                 index < materialCount;
+                 index++)
+            {
+                result[model.LogicalMaterials[index]] =
+                    strengths[index];
+            }
+        }
+        catch (Exception ex)
+        {
+            // The extension is optional. A malformed or inaccessible extension
+            // must not prevent an otherwise valid model from loading.
+            Debug.WriteLine(
+                $"KHR_materials_emissive_strength could not be read: {ex}");
+        }
+
+        return result;
+    }
+
+    private static float[] ReadEmissiveStrengthValues(
+        string path)
+    {
+        byte[] jsonBytes =
+            ReadGltfJsonBytes(
+                path);
+
+        using JsonDocument document =
+            JsonDocument.Parse(
+                jsonBytes);
+
+        if (!document.RootElement.TryGetProperty(
+                "materials",
+                out JsonElement materials) ||
+            materials.ValueKind !=
+                JsonValueKind.Array)
+        {
+            return Array.Empty<float>();
+        }
+
+        float[] strengths =
+            new float[materials.GetArrayLength()];
+
+        Array.Fill(
+            strengths,
+            1.0f);
+
+        int index =
+            0;
+
+        foreach (JsonElement material in
+                 materials.EnumerateArray())
+        {
+            if (material.TryGetProperty(
+                    "extensions",
+                    out JsonElement extensions) &&
+                extensions.TryGetProperty(
+                    "KHR_materials_emissive_strength",
+                    out JsonElement extension) &&
+                extension.TryGetProperty(
+                    "emissiveStrength",
+                    out JsonElement strengthElement) &&
+                strengthElement.TryGetSingle(
+                    out float strength) &&
+                float.IsFinite(
+                    strength) &&
+                strength >=
+                    0.0f)
+            {
+                strengths[index] =
+                    strength;
+            }
+
+            index++;
+        }
+
+        return strengths;
+    }
+
+    private static byte[] ReadGltfJsonBytes(
+        string path)
+    {
+        if (Path.GetExtension(
+                path).Equals(
+                ".gltf",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return File.ReadAllBytes(
+                path);
+        }
+
+        using FileStream stream =
+            File.OpenRead(
+                path);
+
+        using var reader =
+            new BinaryReader(
+                stream);
+
+        const uint glbMagic =
+            0x46546C67;
+
+        const uint jsonChunkType =
+            0x4E4F534A;
+
+        if (reader.ReadUInt32() !=
+            glbMagic)
+        {
+            throw new InvalidDataException(
+                "Invalid GLB header.");
+        }
+
+        uint version =
+            reader.ReadUInt32();
+
+        uint declaredLength =
+            reader.ReadUInt32();
+
+        if (version !=
+                2 ||
+            declaredLength >
+                stream.Length)
+        {
+            throw new InvalidDataException(
+                "Unsupported or truncated GLB file.");
+        }
+
+        while (stream.Position +
+                   8 <=
+               declaredLength)
+        {
+            uint chunkLength =
+                reader.ReadUInt32();
+
+            uint chunkType =
+                reader.ReadUInt32();
+
+            if (chunkLength >
+                declaredLength -
+                stream.Position)
+            {
+                throw new InvalidDataException(
+                    "Invalid GLB chunk length.");
+            }
+
+            byte[] chunk =
+                reader.ReadBytes(
+                    checked((int)chunkLength));
+
+            if (chunkType ==
+                jsonChunkType)
+            {
+                return chunk;
+            }
+        }
+
+        throw new InvalidDataException(
+            "GLB JSON chunk not found.");
     }
 
     /// <summary>

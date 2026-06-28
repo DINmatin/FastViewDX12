@@ -431,6 +431,303 @@ public sealed partial class MainForm
         backgroundMenu.DropDownItems.Add(
             backgroundOpacitySliderHost);
 
+        var postProcessingMenu =
+            new ToolStripMenuItem(
+                "Post Processing");
+
+        var bloomEnabledItem =
+            new ToolStripMenuItem(
+                "Bloom")
+            {
+                CheckOnClick =
+                    true,
+
+                Checked =
+                    _viewerSettings.BloomEnabled
+            };
+
+        int savedBloomThresholdPercent =
+            Math.Clamp(
+                (int)MathF.Round(
+                    _viewerSettings.BloomThreshold *
+                    100.0f),
+                0,
+                100);
+
+        var bloomThresholdLabel =
+            new ToolStripLabel(
+                $"Threshold: {savedBloomThresholdPercent}%")
+            {
+                Enabled =
+                    _viewerSettings.BloomEnabled
+            };
+
+        var bloomThresholdSlider =
+            new TrackBar
+            {
+                Minimum =
+                    0,
+
+                Maximum =
+                    100,
+
+                Value =
+                    savedBloomThresholdPercent,
+
+                SmallChange =
+                    2,
+
+                LargeChange =
+                    10,
+
+                TickFrequency =
+                    10,
+
+                TickStyle =
+                    TickStyle.None,
+
+                AutoSize =
+                    false,
+
+                Size =
+                    new Size(
+                        230,
+                        34),
+
+                TabStop =
+                    false,
+
+                Enabled =
+                    _viewerSettings.BloomEnabled
+            };
+
+        ToolStripControlHost bloomThresholdSliderHost =
+            CreateSliderHost(
+                bloomThresholdSlider);
+
+        bloomThresholdSliderHost.Enabled =
+            _viewerSettings.BloomEnabled;
+
+        int savedBloomIntensityPercent =
+            Math.Clamp(
+                (int)MathF.Round(
+                    _viewerSettings.BloomIntensity *
+                    100.0f),
+                0,
+                300);
+
+        var bloomIntensityLabel =
+            new ToolStripLabel(
+                $"Intensity: {savedBloomIntensityPercent}%")
+            {
+                Enabled =
+                    _viewerSettings.BloomEnabled
+            };
+
+        TrackBar bloomIntensitySlider =
+            CreateIntensitySlider();
+
+        bloomIntensitySlider.Value =
+            savedBloomIntensityPercent;
+
+        bloomIntensitySlider.Enabled =
+            _viewerSettings.BloomEnabled;
+
+        ToolStripControlHost bloomIntensitySliderHost =
+            CreateSliderHost(
+                bloomIntensitySlider);
+
+        bloomIntensitySliderHost.Enabled =
+            _viewerSettings.BloomEnabled;
+
+        int savedBloomRadiusPercent =
+            Math.Clamp(
+                (int)MathF.Round(
+                    _viewerSettings.BloomRadius *
+                    100.0f),
+                0,
+                400);
+
+        var bloomRadiusLabel =
+            new ToolStripLabel(
+                $"Radius: {savedBloomRadiusPercent}%")
+            {
+                Enabled =
+                    _viewerSettings.BloomEnabled
+            };
+
+        var bloomRadiusSlider =
+            new TrackBar
+            {
+                Minimum =
+                    0,
+
+                Maximum =
+                    400,
+
+                Value =
+                    savedBloomRadiusPercent,
+
+                SmallChange =
+                    10,
+
+                LargeChange =
+                    50,
+
+                TickFrequency =
+                    50,
+
+                TickStyle =
+                    TickStyle.None,
+
+                AutoSize =
+                    false,
+
+                Size =
+                    new Size(
+                        230,
+                        34),
+
+                TabStop =
+                    false,
+
+                Enabled =
+                    _viewerSettings.BloomEnabled
+            };
+
+        ToolStripControlHost bloomRadiusSliderHost =
+            CreateSliderHost(
+                bloomRadiusSlider);
+
+        bloomRadiusSliderHost.Enabled =
+            _viewerSettings.BloomEnabled;
+
+        bloomEnabledItem.CheckedChanged +=
+            (_, _) =>
+            {
+                bool enabled =
+                    bloomEnabledItem.Checked;
+
+                _renderer.SetBloomEnabled(
+                    enabled);
+
+                _viewerSettings.BloomEnabled =
+                    enabled;
+
+                bloomThresholdLabel.Enabled =
+                    enabled;
+
+                bloomThresholdSlider.Enabled =
+                    enabled;
+
+                bloomThresholdSliderHost.Enabled =
+                    enabled;
+
+                bloomIntensityLabel.Enabled =
+                    enabled;
+
+                bloomIntensitySlider.Enabled =
+                    enabled;
+
+                bloomIntensitySliderHost.Enabled =
+                    enabled;
+
+                bloomRadiusLabel.Enabled =
+                    enabled;
+
+                bloomRadiusSlider.Enabled =
+                    enabled;
+
+                bloomRadiusSliderHost.Enabled =
+                    enabled;
+
+                ScheduleViewerSettingsSave();
+            };
+
+        bloomThresholdSlider.ValueChanged +=
+            (_, _) =>
+            {
+                float threshold =
+                    bloomThresholdSlider.Value /
+                    100.0f;
+
+                bloomThresholdLabel.Text =
+                    $"Threshold: " +
+                    $"{bloomThresholdSlider.Value}%";
+
+                _renderer.SetBloomThreshold(
+                    threshold);
+
+                _viewerSettings.BloomThreshold =
+                    threshold;
+
+                ScheduleViewerSettingsSave();
+            };
+
+        bloomIntensitySlider.ValueChanged +=
+            (_, _) =>
+            {
+                float intensity =
+                    bloomIntensitySlider.Value /
+                    100.0f;
+
+                bloomIntensityLabel.Text =
+                    $"Intensity: " +
+                    $"{bloomIntensitySlider.Value}%";
+
+                _renderer.SetBloomIntensity(
+                    intensity);
+
+                _viewerSettings.BloomIntensity =
+                    intensity;
+
+                ScheduleViewerSettingsSave();
+            };
+
+        bloomRadiusSlider.ValueChanged +=
+            (_, _) =>
+            {
+                float radius =
+                    bloomRadiusSlider.Value /
+                    100.0f;
+
+                bloomRadiusLabel.Text =
+                    $"Radius: " +
+                    $"{bloomRadiusSlider.Value}%";
+
+                _renderer.SetBloomRadius(
+                    radius);
+
+                _viewerSettings.BloomRadius =
+                    radius;
+
+                ScheduleViewerSettingsSave();
+            };
+
+        postProcessingMenu.DropDownItems.Add(
+            bloomEnabledItem);
+
+        postProcessingMenu.DropDownItems.Add(
+            new ToolStripSeparator());
+
+        postProcessingMenu.DropDownItems.Add(
+            bloomThresholdLabel);
+
+        postProcessingMenu.DropDownItems.Add(
+            bloomThresholdSliderHost);
+
+        postProcessingMenu.DropDownItems.Add(
+            bloomIntensityLabel);
+
+        postProcessingMenu.DropDownItems.Add(
+            bloomIntensitySliderHost);
+
+        postProcessingMenu.DropDownItems.Add(
+            bloomRadiusLabel);
+
+        postProcessingMenu.DropDownItems.Add(
+            bloomRadiusSliderHost);
+
         var environmentEnabledItem =
             new ToolStripMenuItem(
                 "Environment Lighting")
@@ -567,6 +864,9 @@ public sealed partial class MainForm
 
         viewMenu.DropDownItems.Add(
             backgroundMenu);
+
+        viewMenu.DropDownItems.Add(
+            postProcessingMenu);
 
         viewMenu.DropDownItems.Add(
             new ToolStripSeparator());

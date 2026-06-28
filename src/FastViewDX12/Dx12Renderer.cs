@@ -256,6 +256,8 @@ public sealed partial class Dx12Renderer : IDisposable
         _backgroundPipelineState?.Dispose();
         _backgroundRootSignature?.Dispose();
 
+        DisposePostProcessPipeline();
+
         _blendSingleSidedPipelineState?.Dispose();
         _opaqueSingleSidedPipelineState?.Dispose();
         _blendPipelineState?.Dispose();

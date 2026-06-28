@@ -80,6 +80,7 @@ public sealed partial class Dx12Renderer
         CreateDepthBuffer();
         CreateSimplePipeline();
         CreateBackgroundPipeline();
+        CreatePostProcessPipeline();
         CreateSrvHeap(1);
 
         int width =
@@ -111,6 +112,10 @@ public sealed partial class Dx12Renderer
                 0,
                 width,
                 height);
+
+        CreatePostProcessResources(
+            width,
+            height);
 
         _fence =
             _device.CreateFence(
@@ -428,6 +433,9 @@ public sealed partial class Dx12Renderer
 
         CreateRenderTargetViews();
         CreateDepthBuffer();
+        CreatePostProcessResources(
+            width,
+            height);
 
         _viewport =
             new Viewport(

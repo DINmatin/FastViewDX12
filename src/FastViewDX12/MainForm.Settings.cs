@@ -12,7 +12,7 @@ namespace FastViewDX12;
 public sealed partial class MainForm
 {
     private const int ViewerSettingsVersion =
-        2;
+        3;
 
     private const int ViewerSettingsPollMilliseconds =
         250;
@@ -70,6 +70,17 @@ public sealed partial class MainForm
             1.0f;
 
         public float DirectLightIntensity { get; set; } =
+            1.0f;
+
+        public bool BloomEnabled { get; set; }
+
+        public float BloomThreshold { get; set; } =
+            0.78f;
+
+        public float BloomIntensity { get; set; } =
+            0.8f;
+
+        public float BloomRadius { get; set; } =
             1.0f;
 
         public bool GridVisible { get; set; }
@@ -182,6 +193,27 @@ public sealed partial class MainForm
                 _viewerSettings.DirectLightIntensity,
                 0.0f,
                 3.0f,
+                1.0f);
+
+        _viewerSettings.BloomThreshold =
+            ClampFinite(
+                _viewerSettings.BloomThreshold,
+                0.0f,
+                1.0f,
+                0.78f);
+
+        _viewerSettings.BloomIntensity =
+            ClampFinite(
+                _viewerSettings.BloomIntensity,
+                0.0f,
+                3.0f,
+                0.8f);
+
+        _viewerSettings.BloomRadius =
+            ClampFinite(
+                _viewerSettings.BloomRadius,
+                0.0f,
+                4.0f,
                 1.0f);
 
         _viewerSettings.TransformMode =
@@ -310,6 +342,18 @@ public sealed partial class MainForm
 
         _renderer.SetDirectLightIntensity(
             _viewerSettings.DirectLightIntensity);
+
+        _renderer.SetBloomEnabled(
+            _viewerSettings.BloomEnabled);
+
+        _renderer.SetBloomThreshold(
+            _viewerSettings.BloomThreshold);
+
+        _renderer.SetBloomIntensity(
+            _viewerSettings.BloomIntensity);
+
+        _renderer.SetBloomRadius(
+            _viewerSettings.BloomRadius);
     }
 
     /// <summary>

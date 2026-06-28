@@ -179,7 +179,7 @@ public sealed partial class Dx12Renderer
         DecodedTexture emissive =
             DecodeTextureOrFallback(
                 source.EmissiveTextureBytes,
-                CreateBlackPixel(),
+                DecodedTexture.WhitePixel(),
                 $"{source.Name} Emissive");
 
         uint descriptorStart =
@@ -219,19 +219,6 @@ public sealed partial class Dx12Renderer
             normalTexture,
             metallicRoughnessTexture,
             emissiveTexture);
-    }
-
-    private static DecodedTexture CreateBlackPixel()
-    {
-        return new DecodedTexture(
-            1,
-            1,
-            [
-                0,
-                0,
-                0,
-                255
-            ]);
     }
 
     private static DecodedTexture DecodeTextureOrFallback(

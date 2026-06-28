@@ -187,6 +187,11 @@ public sealed partial class Dx12Renderer
                 pipelineState);
         }
 
+        ApplyBloom(
+            backBuffer,
+            width,
+            height);
+
         PreviewCaptureRequest? previewRequest =
             _pendingPreviewCapture;
 

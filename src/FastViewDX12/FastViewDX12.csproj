@@ -43,6 +43,31 @@
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>
 
+    <Content Include="Shaders\PostProcessVS.cso">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+
+    <Content Include="Shaders\BloomBrightPS.cso">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+
+    <Content Include="Shaders\BloomBlurHorizontalPS.cso">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+
+    <Content Include="Shaders\BloomBlurVerticalPS.cso">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+
+    <Content Include="Shaders\BloomCompositePS.cso">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+
     <None Update="Assets\Environment\default.exr">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
@@ -60,8 +85,8 @@
   </ItemGroup>
   <Target Name="CompileFastViewShaders"
           BeforeTargets="BeforeBuild"
-          Inputs="$(ProjectDir)Shaders\Simple.hlsl;$(ProjectDir)Shaders\Background.hlsl"
-          Outputs="$(ProjectDir)Shaders\SimpleVS.cso;$(ProjectDir)Shaders\SimplePS.cso;$(ProjectDir)Shaders\BackgroundVS.cso;$(ProjectDir)Shaders\BackgroundPS.cso">
+          Inputs="$(ProjectDir)Shaders\Simple.hlsl;$(ProjectDir)Shaders\Background.hlsl;$(ProjectDir)Shaders\PostProcess.hlsl"
+          Outputs="$(ProjectDir)Shaders\SimpleVS.cso;$(ProjectDir)Shaders\SimplePS.cso;$(ProjectDir)Shaders\BackgroundVS.cso;$(ProjectDir)Shaders\BackgroundPS.cso;$(ProjectDir)Shaders\PostProcessVS.cso;$(ProjectDir)Shaders\BloomBrightPS.cso;$(ProjectDir)Shaders\BloomBlurHorizontalPS.cso;$(ProjectDir)Shaders\BloomBlurVerticalPS.cso;$(ProjectDir)Shaders\BloomCompositePS.cso">
     <PropertyGroup>
       <FastViewDxc>$(PkgMicrosoft_Direct3D_DXC)\build\native\bin\x64\dxc.exe</FastViewDxc>
     </PropertyGroup>
@@ -73,5 +98,10 @@
     <Exec Command="&quot;$(FastViewDxc)&quot; -nologo -T ps_6_0 -E PSMain -Fo &quot;$(ProjectDir)Shaders\SimplePS.cso&quot; &quot;$(ProjectDir)Shaders\Simple.hlsl&quot;" />
     <Exec Command="&quot;$(FastViewDxc)&quot; -nologo -T vs_6_0 -E VSMain -Fo &quot;$(ProjectDir)Shaders\BackgroundVS.cso&quot; &quot;$(ProjectDir)Shaders\Background.hlsl&quot;" />
     <Exec Command="&quot;$(FastViewDxc)&quot; -nologo -T ps_6_0 -E PSMain -Fo &quot;$(ProjectDir)Shaders\BackgroundPS.cso&quot; &quot;$(ProjectDir)Shaders\Background.hlsl&quot;" />
+    <Exec Command="&quot;$(FastViewDxc)&quot; -nologo -T vs_6_0 -E VSMain -Fo &quot;$(ProjectDir)Shaders\PostProcessVS.cso&quot; &quot;$(ProjectDir)Shaders\PostProcess.hlsl&quot;" />
+    <Exec Command="&quot;$(FastViewDxc)&quot; -nologo -T ps_6_0 -E PSBright -Fo &quot;$(ProjectDir)Shaders\BloomBrightPS.cso&quot; &quot;$(ProjectDir)Shaders\PostProcess.hlsl&quot;" />
+    <Exec Command="&quot;$(FastViewDxc)&quot; -nologo -T ps_6_0 -E PSBlurHorizontal -Fo &quot;$(ProjectDir)Shaders\BloomBlurHorizontalPS.cso&quot; &quot;$(ProjectDir)Shaders\PostProcess.hlsl&quot;" />
+    <Exec Command="&quot;$(FastViewDxc)&quot; -nologo -T ps_6_0 -E PSBlurVertical -Fo &quot;$(ProjectDir)Shaders\BloomBlurVerticalPS.cso&quot; &quot;$(ProjectDir)Shaders\PostProcess.hlsl&quot;" />
+    <Exec Command="&quot;$(FastViewDxc)&quot; -nologo -T ps_6_0 -E PSComposite -Fo &quot;$(ProjectDir)Shaders\BloomCompositePS.cso&quot; &quot;$(ProjectDir)Shaders\PostProcess.hlsl&quot;" />
   </Target>
 </Project>
