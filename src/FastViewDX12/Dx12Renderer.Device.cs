@@ -81,7 +81,10 @@ public sealed partial class Dx12Renderer
         CreateSimplePipeline();
         CreateBackgroundPipeline();
         CreatePostProcessPipeline();
+        CreateShadowPipeline();
+        CreateShadowResources();
         CreateSrvHeap(1);
+        CreateShadowSrv();
 
         int width =
             Math.Max(
@@ -173,6 +176,14 @@ public sealed partial class Dx12Renderer
                 flags:
                     DescriptorRangeFlags.None);
 
+        var shadowSrvRange =
+            new DescriptorRange1(
+                DescriptorRangeType.ShaderResourceView,
+                1,
+                5,
+                flags:
+                    DescriptorRangeFlags.None);
+
         var rootSignatureDescription =
             new RootSignatureDescription1(
                 RootSignatureFlags
@@ -194,6 +205,11 @@ public sealed partial class Dx12Renderer
     new RootParameter1(
     new RootDescriptorTable1(
         environmentSrvRange),
+    ShaderVisibility.Pixel),
+
+    new RootParameter1(
+    new RootDescriptorTable1(
+        shadowSrvRange),
     ShaderVisibility.Pixel)
                 ],
                 [
@@ -201,6 +217,12 @@ public sealed partial class Dx12Renderer
                         SamplerDescription.LinearWrap,
                         ShaderVisibility.Pixel,
                         0,
+                        0),
+
+                    new StaticSamplerDescription(
+                        SamplerDescription.LinearClamp,
+                        ShaderVisibility.Pixel,
+                        1,
                         0)
                 ]);
 

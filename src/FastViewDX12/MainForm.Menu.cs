@@ -728,6 +728,232 @@ public sealed partial class MainForm
         postProcessingMenu.DropDownItems.Add(
             bloomRadiusSliderHost);
 
+        var shadowsEnabledItem =
+            new ToolStripMenuItem(
+                "Directional Shadows")
+            {
+                CheckOnClick =
+                    true,
+
+                Checked =
+                    _viewerSettings.ShadowsEnabled
+            };
+
+        int savedShadowStrengthPercent =
+            Math.Clamp(
+                (int)MathF.Round(
+                    _viewerSettings.ShadowStrength *
+                    100.0f),
+                0,
+                100);
+
+        var shadowStrengthLabel =
+            new ToolStripLabel(
+                $"Shadow strength: {savedShadowStrengthPercent}%")
+            {
+                Enabled =
+                    _viewerSettings.ShadowsEnabled
+            };
+
+        var shadowStrengthSlider =
+            new TrackBar
+            {
+                Minimum =
+                    0,
+
+                Maximum =
+                    100,
+
+                Value =
+                    savedShadowStrengthPercent,
+
+                SmallChange =
+                    2,
+
+                LargeChange =
+                    10,
+
+                TickFrequency =
+                    10,
+
+                TickStyle =
+                    TickStyle.None,
+
+                AutoSize =
+                    false,
+
+                Size =
+                    new Size(
+                        230,
+                        34),
+
+                TabStop =
+                    false,
+
+                Enabled =
+                    _viewerSettings.ShadowsEnabled
+            };
+
+        ToolStripControlHost shadowStrengthSliderHost =
+            CreateSliderHost(
+                shadowStrengthSlider);
+
+        shadowStrengthSliderHost.Enabled =
+            _viewerSettings.ShadowsEnabled;
+
+        int savedShadowSoftnessPercent =
+            Math.Clamp(
+                (int)MathF.Round(
+                    _viewerSettings.ShadowSoftness *
+                    100.0f),
+                0,
+                300);
+
+        var shadowSoftnessLabel =
+            new ToolStripLabel(
+                $"Shadow softness: {savedShadowSoftnessPercent}%")
+            {
+                Enabled =
+                    _viewerSettings.ShadowsEnabled
+            };
+
+        var shadowSoftnessSlider =
+            new TrackBar
+            {
+                Minimum =
+                    0,
+
+                Maximum =
+                    300,
+
+                Value =
+                    savedShadowSoftnessPercent,
+
+                SmallChange =
+                    10,
+
+                LargeChange =
+                    50,
+
+                TickFrequency =
+                    50,
+
+                TickStyle =
+                    TickStyle.None,
+
+                AutoSize =
+                    false,
+
+                Size =
+                    new Size(
+                        230,
+                        34),
+
+                TabStop =
+                    false,
+
+                Enabled =
+                    _viewerSettings.ShadowsEnabled
+            };
+
+        ToolStripControlHost shadowSoftnessSliderHost =
+            CreateSliderHost(
+                shadowSoftnessSlider);
+
+        shadowSoftnessSliderHost.Enabled =
+            _viewerSettings.ShadowsEnabled;
+
+        shadowsEnabledItem.CheckedChanged +=
+            (_, _) =>
+            {
+                bool enabled =
+                    shadowsEnabledItem.Checked;
+
+                _renderer.SetShadowsEnabled(
+                    enabled);
+
+                _viewerSettings.ShadowsEnabled =
+                    enabled;
+
+                shadowStrengthLabel.Enabled =
+                    enabled;
+
+                shadowStrengthSlider.Enabled =
+                    enabled;
+
+                shadowStrengthSliderHost.Enabled =
+                    enabled;
+
+                shadowSoftnessLabel.Enabled =
+                    enabled;
+
+                shadowSoftnessSlider.Enabled =
+                    enabled;
+
+                shadowSoftnessSliderHost.Enabled =
+                    enabled;
+
+                ScheduleViewerSettingsSave();
+            };
+
+        shadowStrengthSlider.ValueChanged +=
+            (_, _) =>
+            {
+                float strength =
+                    shadowStrengthSlider.Value /
+                    100.0f;
+
+                shadowStrengthLabel.Text =
+                    $"Shadow strength: " +
+                    $"{shadowStrengthSlider.Value}%";
+
+                _renderer.SetShadowStrength(
+                    strength);
+
+                _viewerSettings.ShadowStrength =
+                    strength;
+
+                ScheduleViewerSettingsSave();
+            };
+
+        shadowSoftnessSlider.ValueChanged +=
+            (_, _) =>
+            {
+                float softness =
+                    shadowSoftnessSlider.Value /
+                    100.0f;
+
+                shadowSoftnessLabel.Text =
+                    $"Shadow softness: " +
+                    $"{shadowSoftnessSlider.Value}%";
+
+                _renderer.SetShadowSoftness(
+                    softness);
+
+                _viewerSettings.ShadowSoftness =
+                    softness;
+
+                ScheduleViewerSettingsSave();
+            };
+
+        postProcessingMenu.DropDownItems.Add(
+            new ToolStripSeparator());
+
+        postProcessingMenu.DropDownItems.Add(
+            shadowsEnabledItem);
+
+        postProcessingMenu.DropDownItems.Add(
+            shadowStrengthLabel);
+
+        postProcessingMenu.DropDownItems.Add(
+            shadowStrengthSliderHost);
+
+        postProcessingMenu.DropDownItems.Add(
+            shadowSoftnessLabel);
+
+        postProcessingMenu.DropDownItems.Add(
+            shadowSoftnessSliderHost);
+
         var environmentEnabledItem =
             new ToolStripMenuItem(
                 "Environment Lighting")

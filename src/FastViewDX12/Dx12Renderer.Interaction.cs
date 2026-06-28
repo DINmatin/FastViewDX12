@@ -266,6 +266,7 @@ public sealed partial class Dx12Renderer
         System.Drawing.Point mousePosition)
     {
         _light.OnMouseMove(mousePosition);
+        MarkShadowMapDirty();
     }
 
     /// <summary>

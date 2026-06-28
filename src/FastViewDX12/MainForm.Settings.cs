@@ -12,7 +12,7 @@ namespace FastViewDX12;
 public sealed partial class MainForm
 {
     private const int ViewerSettingsVersion =
-        3;
+        4;
 
     private const int ViewerSettingsPollMilliseconds =
         250;
@@ -81,6 +81,15 @@ public sealed partial class MainForm
             0.8f;
 
         public float BloomRadius { get; set; } =
+            1.0f;
+
+        public bool ShadowsEnabled { get; set; } =
+            true;
+
+        public float ShadowStrength { get; set; } =
+            0.78f;
+
+        public float ShadowSoftness { get; set; } =
             1.0f;
 
         public bool GridVisible { get; set; }
@@ -214,6 +223,20 @@ public sealed partial class MainForm
                 _viewerSettings.BloomRadius,
                 0.0f,
                 4.0f,
+                1.0f);
+
+        _viewerSettings.ShadowStrength =
+            ClampFinite(
+                _viewerSettings.ShadowStrength,
+                0.0f,
+                1.0f,
+                0.78f);
+
+        _viewerSettings.ShadowSoftness =
+            ClampFinite(
+                _viewerSettings.ShadowSoftness,
+                0.0f,
+                3.0f,
                 1.0f);
 
         _viewerSettings.TransformMode =
@@ -354,6 +377,15 @@ public sealed partial class MainForm
 
         _renderer.SetBloomRadius(
             _viewerSettings.BloomRadius);
+
+        _renderer.SetShadowsEnabled(
+            _viewerSettings.ShadowsEnabled);
+
+        _renderer.SetShadowStrength(
+            _viewerSettings.ShadowStrength);
+
+        _renderer.SetShadowSoftness(
+            _viewerSettings.ShadowSoftness);
     }
 
     /// <summary>

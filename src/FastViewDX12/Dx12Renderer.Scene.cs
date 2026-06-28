@@ -114,7 +114,7 @@ public sealed partial class Dx12Renderer
     }
 
     /// <summary>
-    /// Allocates the shader-visible descriptor heap used by the environment map and material textures.
+    /// Allocates the shader-visible descriptor heap used by global editor textures and material textures.
     /// </summary>
     private void CreateSrvHeap(
         uint materialCount)
@@ -505,7 +505,7 @@ public sealed partial class Dx12Renderer
         }
 
         const int constantBufferSize =
-            256;
+            512;
 
         ID3D12Resource constantBuffer =
             _device.CreateCommittedResource(
@@ -647,6 +647,7 @@ public sealed partial class Dx12Renderer
             (uint)_scene.Materials.Count);
 
         CreateEnvironmentSrv();
+        CreateShadowSrv();
 
         for (int i = 0;
              i < _scene.Materials.Count;
@@ -709,6 +710,8 @@ public sealed partial class Dx12Renderer
             _camera.FitToScene(
                 _scene);
         }
+
+        MarkShadowMapDirty();
 
         Debug.WriteLine(
             $"Renderer scene ready: " +
@@ -809,6 +812,8 @@ public sealed partial class Dx12Renderer
                     renderItem);
             }
         }
+
+        MarkShadowMapDirty();
     }
 
     /// <summary>

@@ -1,6 +1,7 @@
 cbuffer SceneBuffer : register(b0)
 {
     float4x4 ViewProjection;
+    float4x4 LightViewProjection;
 
     float4 CameraPosition;
     float4 LightDirection;
@@ -27,6 +28,10 @@ cbuffer SceneBuffer : register(b0)
     // Packed sampler addressing pairs for BaseColor, Normal,
     // MetallicRoughness, and Emissive textures.
     float4 TextureSamplerIndices;
+
+    // x = shadow strength, y = softness in texels, z = receiver bias,
+    // w = inverse shadow-map size.
+    float4 ShadowSettings;
 };
 
 Texture2D BaseColorTexture : register(t0);
@@ -34,8 +39,10 @@ Texture2D NormalTexture : register(t1);
 Texture2D MetallicRoughnessTexture : register(t2);
 Texture2D EmissiveTexture : register(t3);
 Texture2D EnvironmentTexture : register(t4);
+Texture2D ShadowMap : register(t5);
 
 SamplerState TextureSampler : register(s0);
+SamplerState ShadowSampler : register(s1);
 
 struct VSInput
 {
@@ -424,6 +431,139 @@ float3 FresnelSchlickRoughness(
             5.0f);
 }
 
+
+float CalculateShadowVisibility(
+    float3 worldPosition,
+    float3 surfaceNormal,
+    float3 directionToLight)
+{
+    if (ShadowSettings.x <=
+        0.0001f)
+    {
+        return 1.0f;
+    }
+
+    float4 shadowClip =
+        mul(
+            float4(
+                worldPosition,
+                1.0f),
+            LightViewProjection);
+
+    if (shadowClip.w <=
+        0.000001f)
+    {
+        return 1.0f;
+    }
+
+    float3 shadowNdc =
+        shadowClip.xyz /
+        shadowClip.w;
+
+    float2 shadowUv =
+        float2(
+            shadowNdc.x *
+            0.5f +
+            0.5f,
+
+            -shadowNdc.y *
+            0.5f +
+            0.5f);
+
+    if (shadowUv.x <= 0.0f ||
+        shadowUv.x >= 1.0f ||
+        shadowUv.y <= 0.0f ||
+        shadowUv.y >= 1.0f ||
+        shadowNdc.z <= 0.0f ||
+        shadowNdc.z >= 1.0f)
+    {
+        return 1.0f;
+    }
+
+    float normalBias =
+        ShadowSettings.z *
+        (1.0f +
+         2.0f *
+         (1.0f -
+          saturate(
+              dot(
+                  surfaceNormal,
+                  directionToLight))));
+
+    float receiverDepth =
+        shadowNdc.z -
+        normalBias;
+
+    float softness =
+        max(
+            ShadowSettings.y,
+            0.0f);
+
+    if (softness <=
+        0.05f)
+    {
+        float storedDepth =
+            ShadowMap.SampleLevel(
+                ShadowSampler,
+                shadowUv,
+                0.0f).r;
+
+        float hardVisibility =
+            receiverDepth <=
+            storedDepth
+                ? 1.0f
+                : 0.0f;
+
+        return lerp(
+            1.0f,
+            hardVisibility,
+            ShadowSettings.x);
+    }
+
+    float visibility =
+        0.0f;
+
+    [unroll]
+    for (int y = -1;
+         y <= 1;
+         y++)
+    {
+        [unroll]
+        for (int x = -1;
+             x <= 1;
+             x++)
+        {
+            float2 offset =
+                float2(
+                    x,
+                    y) *
+                ShadowSettings.w *
+                softness;
+
+            float storedDepth =
+                ShadowMap.SampleLevel(
+                    ShadowSampler,
+                    shadowUv +
+                    offset,
+                    0.0f).r;
+
+            visibility +=
+                receiverDepth <=
+                storedDepth
+                    ? 1.0f
+                    : 0.0f;
+        }
+    }
+
+    visibility /=
+        9.0f;
+
+    return lerp(
+        1.0f,
+        visibility,
+        ShadowSettings.x);
+}
+
 float3 ToneMapAndEncode(
     float3 linearColor)
 {
@@ -725,6 +865,15 @@ float4 PSMain(
         directDiffuseLighting +
         directSpecularLighting;
 
+    float shadowVisibility =
+        CalculateShadowVisibility(
+            input.WorldPosition,
+            normal,
+            directionToLight);
+
+    directLighting *=
+        shadowVisibility;
+
     float upwardFactor =
         saturate(
             normal.y *
@@ -788,7 +937,7 @@ float4 PSMain(
         normalView,
         baseReflectance,
         roughness);
-    
+
     float reflectionStrength =
     lerp(
         1.0f,
@@ -799,7 +948,7 @@ float4 PSMain(
     reflectedEnvironment *
     environmentFresnel *
     reflectionStrength;
-    
+
     float3 finalColor =
         directLighting +
         ambientDiffuse +

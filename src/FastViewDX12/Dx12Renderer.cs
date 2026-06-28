@@ -18,9 +18,11 @@ namespace FastViewDX12;
 /// </remarks>
 public sealed partial class Dx12Renderer : IDisposable
 {
-    private const uint GlobalTextureDescriptorCount = 1;
+    private const uint GlobalTextureDescriptorCount = 2;
 
     private const uint EnvironmentTextureSlot = 0;
+
+    private const uint ShadowTextureSlot = 1;
 
     private const int FrameCount = 2;
 
@@ -185,6 +187,8 @@ public sealed partial class Dx12Renderer : IDisposable
     {
         public System.Numerics.Matrix4x4 ViewProjection;
 
+        public System.Numerics.Matrix4x4 LightViewProjection;
+
         public System.Numerics.Vector4 CameraPosition;
 
         public System.Numerics.Vector4 LightDirection;
@@ -209,6 +213,10 @@ public sealed partial class Dx12Renderer : IDisposable
         // z = MetallicRoughness sampler index
         // w = Emissive sampler index
         public System.Numerics.Vector4 TextureSamplerIndices;
+
+        // x = shadow strength, y = softness in texels, z = receiver bias,
+        // w = inverse shadow-map size.
+        public System.Numerics.Vector4 ShadowSettings;
     }
 
     [System.Runtime.InteropServices.StructLayout(
@@ -257,6 +265,7 @@ public sealed partial class Dx12Renderer : IDisposable
         _backgroundRootSignature?.Dispose();
 
         DisposePostProcessPipeline();
+        DisposeShadowPipeline();
 
         _blendSingleSidedPipelineState?.Dispose();
         _opaqueSingleSidedPipelineState?.Dispose();

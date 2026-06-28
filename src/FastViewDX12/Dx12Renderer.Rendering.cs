@@ -57,6 +57,8 @@ public sealed partial class Dx12Renderer
         _commandList.Reset(
             allocator);
 
+        RenderShadowMapIfNeeded();
+
         ID3D12Resource backBuffer =
             _renderTargets[
                 (int)_frameIndex]!;
@@ -137,6 +139,18 @@ public sealed partial class Dx12Renderer
         _commandList.SetGraphicsRootDescriptorTable(
             2,
             environmentHandle);
+
+        GpuDescriptorHandle shadowHandle =
+            _srvHeap
+                .GetGPUDescriptorHandleForHeapStart();
+
+        shadowHandle.Ptr +=
+            ShadowTextureSlot *
+            _srvDescriptorSize;
+
+        _commandList.SetGraphicsRootDescriptorTable(
+            3,
+            shadowHandle);
 
         _commandList.IASetPrimitiveTopology(
             PrimitiveTopology.TriangleList);
@@ -403,6 +417,10 @@ public sealed partial class Dx12Renderer
                 ViewProjection =
                     viewProjection,
 
+                LightViewProjection =
+                    System.Numerics.Matrix4x4.Transpose(
+                        _lightViewProjection),
+
                 CameraPosition =
                     new System.Numerics.Vector4(
                         _camera.GetCameraPosition(),
@@ -469,7 +487,10 @@ public sealed partial class Dx12Renderer
                             .GetSamplerIndex(),
 
                         material.EmissiveTextureMapping
-                            .GetSamplerIndex())
+                            .GetSamplerIndex()),
+
+                ShadowSettings =
+                    CreateShadowSettings()
             };
 
         item.ConstantBuffer.SetData(
@@ -482,8 +503,18 @@ public sealed partial class Dx12Renderer
     public void SetDirectLightEnabled(
         bool enabled)
     {
+        bool changed =
+            _directLightEnabled !=
+            enabled;
+
         _directLightEnabled =
             enabled;
+
+        if (changed &&
+            enabled)
+        {
+            MarkShadowMapDirty();
+        }
     }
 
     /// <summary>
