@@ -9,6 +9,10 @@ namespace FastViewDX12;
 // Menu construction and commands that require user dialogs.
 public sealed partial class MainForm
 {
+    private ToolStripMenuItem? _bloomEnabledMenuItem;
+
+    private ToolStripMenuItem? _shadowsEnabledMenuItem;
+
     /// <summary>
     /// Builds all File, View, Lighting, and background controls and connects them to renderer commands.
     /// </summary>
@@ -602,6 +606,9 @@ public sealed partial class MainForm
         bloomRadiusSliderHost.Enabled =
             _viewerSettings.BloomEnabled;
 
+        _bloomEnabledMenuItem =
+            bloomEnabledItem;
+
         bloomEnabledItem.CheckedChanged +=
             (_, _) =>
             {
@@ -641,6 +648,7 @@ public sealed partial class MainForm
                 bloomRadiusSliderHost.Enabled =
                     enabled;
 
+                UpdateTransformToolbarState();
                 ScheduleViewerSettingsSave();
             };
 
@@ -863,6 +871,9 @@ public sealed partial class MainForm
         shadowSoftnessSliderHost.Enabled =
             _viewerSettings.ShadowsEnabled;
 
+        _shadowsEnabledMenuItem =
+            shadowsEnabledItem;
+
         shadowsEnabledItem.CheckedChanged +=
             (_, _) =>
             {
@@ -893,6 +904,7 @@ public sealed partial class MainForm
                 shadowSoftnessSliderHost.Enabled =
                     enabled;
 
+                UpdateTransformToolbarState();
                 ScheduleViewerSettingsSave();
             };
 

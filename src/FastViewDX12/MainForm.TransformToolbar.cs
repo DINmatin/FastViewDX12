@@ -38,6 +38,10 @@ public sealed partial class MainForm
 
     private TransformToolbarButton? _backViewButton;
 
+    private TransformToolbarButton? _shadowsButton;
+
+    private TransformToolbarButton? _bloomButton;
+
     private ToolTip? _transformToolbarToolTip;
 
     private enum TransformToolbarIcon
@@ -51,7 +55,9 @@ public sealed partial class MainForm
         LeftView,
         TopView,
         BottomView,
-        BackView
+        BackView,
+        Shadows,
+        Bloom
     }
 
     private enum CameraPresetView
@@ -84,9 +90,12 @@ public sealed partial class MainForm
                 Size =
                     new Size(
                         TransformToolbarButtonSize,
-                        TransformToolbarButtonSize * 10 +
-                        TransformToolbarButtonGap * 8 +
-                        10)
+                        TransformToolbarButtonSize * 12 +
+                        TransformToolbarButtonGap * 10 +
+                        20),
+
+                Visible =
+                    false
             };
 
         _moveTransformButton =
@@ -138,6 +147,16 @@ public sealed partial class MainForm
             CreateTransformToolbarButton(
                 TransformToolbarIcon.BackView,
                 "Back view");
+
+        _shadowsButton =
+            CreateTransformToolbarButton(
+                TransformToolbarIcon.Shadows,
+                "Toggle directional shadows");
+
+        _bloomButton =
+            CreateTransformToolbarButton(
+                TransformToolbarIcon.Bloom,
+                "Toggle bloom");
 
         _moveTransformButton.Click +=
             (_, _) =>
@@ -208,6 +227,26 @@ public sealed partial class MainForm
                     CameraPresetView.Back);
             };
 
+        _shadowsButton.Click +=
+            (_, _) =>
+            {
+                if (_shadowsEnabledMenuItem != null)
+                {
+                    _shadowsEnabledMenuItem.Checked =
+                        !_shadowsEnabledMenuItem.Checked;
+                }
+            };
+
+        _bloomButton.Click +=
+            (_, _) =>
+            {
+                if (_bloomEnabledMenuItem != null)
+                {
+                    _bloomEnabledMenuItem.Checked =
+                        !_bloomEnabledMenuItem.Checked;
+                }
+            };
+
         AddTransformToolbarButton(
             _moveTransformButton,
             0);
@@ -253,6 +292,16 @@ public sealed partial class MainForm
             _backViewButton,
             5,
             secondGroup: true);
+
+        AddTransformToolbarButton(
+            _shadowsButton,
+            0,
+            thirdGroup: true);
+
+        AddTransformToolbarButton(
+            _bloomButton,
+            1,
+            thirdGroup: true);
 
         _transformToolbarToolTip =
             new ToolTip
@@ -310,6 +359,14 @@ public sealed partial class MainForm
             _backViewButton,
             "Back view");
 
+        _transformToolbarToolTip.SetToolTip(
+            _shadowsButton,
+            "Directional shadows on / off");
+
+        _transformToolbarToolTip.SetToolTip(
+            _bloomButton,
+            "Bloom on / off");
+
         _transformToolbar.Disposed +=
             (_, _) =>
             {
@@ -352,7 +409,8 @@ public sealed partial class MainForm
     private void AddTransformToolbarButton(
         TransformToolbarButton button,
         int index,
-        bool secondGroup = false)
+        bool secondGroup = false,
+        bool thirdGroup = false)
     {
         if (_transformToolbar ==
             null)
@@ -371,6 +429,14 @@ public sealed partial class MainForm
                 TransformToolbarButtonSize * 4 +
                 TransformToolbarButtonGap * 4 +
                 10;
+        }
+
+        if (thirdGroup)
+        {
+            y +=
+                TransformToolbarButtonSize * 10 +
+                TransformToolbarButtonGap * 9 +
+                20;
         }
 
         button.Location =
@@ -429,10 +495,24 @@ public sealed partial class MainForm
         _orientationTransformButton.Selected =
             localOrientation;
 
+        if (_shadowsButton != null)
+        {
+            _shadowsButton.Selected =
+                _viewerSettings.ShadowsEnabled;
+        }
+
+        if (_bloomButton != null)
+        {
+            _bloomButton.Selected =
+                _viewerSettings.BloomEnabled;
+        }
+
         _moveTransformButton.Invalidate();
         _rotateTransformButton.Invalidate();
         _scaleTransformButton.Invalidate();
         _orientationTransformButton.Invalidate();
+        _shadowsButton?.Invalidate();
+        _bloomButton?.Invalidate();
     }
 
     partial void TransformToolbarStateChanged()
@@ -689,6 +769,22 @@ public sealed partial class MainForm
                         iconBrush,
                         iconBounds,
                         "BK");
+                    break;
+
+                case TransformToolbarIcon.Shadows:
+                    DrawShadowsIcon(
+                        graphics,
+                        iconPen,
+                        iconBrush,
+                        iconBounds);
+                    break;
+
+                case TransformToolbarIcon.Bloom:
+                    DrawBloomIcon(
+                        graphics,
+                        iconPen,
+                        iconBrush,
+                        iconBounds);
                     break;
             }
 
@@ -1122,6 +1218,164 @@ public sealed partial class MainForm
                 labelBrush,
                 labelX,
                 labelY);
+        }
+
+        private static void DrawShadowsIcon(
+            Graphics graphics,
+            Pen pen,
+            Brush brush,
+            Rectangle bounds)
+        {
+            PointF lightCenter =
+                new(
+                    bounds.Left + 6.0f,
+                    bounds.Top + 6.0f);
+
+            graphics.FillEllipse(
+                brush,
+                lightCenter.X - 3.0f,
+                lightCenter.Y - 3.0f,
+                6.0f,
+                6.0f);
+
+            for (int index = 0;
+                 index < 8;
+                 index++)
+            {
+                float angle =
+                    index * MathF.PI * 0.25f;
+
+                PointF rayStart =
+                    new(
+                        lightCenter.X + MathF.Cos(angle) * 5.0f,
+                        lightCenter.Y + MathF.Sin(angle) * 5.0f);
+
+                PointF rayEnd =
+                    new(
+                        lightCenter.X + MathF.Cos(angle) * 8.0f,
+                        lightCenter.Y + MathF.Sin(angle) * 8.0f);
+
+                graphics.DrawLine(
+                    pen,
+                    rayStart,
+                    rayEnd);
+            }
+
+            RectangleF objectBounds =
+                new(
+                    bounds.Left + 10.0f,
+                    bounds.Top + 11.0f,
+                    7.0f,
+                    9.0f);
+
+            graphics.DrawRectangle(
+                pen,
+                objectBounds.X,
+                objectBounds.Y,
+                objectBounds.Width,
+                objectBounds.Height);
+
+            PointF shadowTop =
+                new(
+                    objectBounds.Right + 2.0f,
+                    objectBounds.Top + 3.0f);
+
+            PointF shadowBottom =
+                new(
+                    bounds.Right - 1.0f,
+                    bounds.Bottom - 2.0f);
+
+            using var shadowBrush =
+                new SolidBrush(
+                    Color.FromArgb(
+                        150,
+                        pen.Color));
+
+            graphics.FillPolygon(
+                shadowBrush,
+                [
+                    shadowTop,
+                    new PointF(
+                        objectBounds.Right + 2.0f,
+                        objectBounds.Bottom),
+                    shadowBottom,
+                    new PointF(
+                        shadowBottom.X,
+                        shadowTop.Y + 5.0f)
+                ]);
+        }
+
+        private static void DrawBloomIcon(
+            Graphics graphics,
+            Pen pen,
+            Brush brush,
+            Rectangle bounds)
+        {
+            PointF center =
+                new(
+                    bounds.Left + bounds.Width * 0.5f,
+                    bounds.Top + bounds.Height * 0.5f);
+
+            float innerRadius =
+                MathF.Min(
+                    bounds.Width,
+                    bounds.Height) * 0.18f;
+
+            graphics.FillEllipse(
+                brush,
+                center.X - innerRadius,
+                center.Y - innerRadius,
+                innerRadius * 2.0f,
+                innerRadius * 2.0f);
+
+            for (int index = 0;
+                 index < 8;
+                 index++)
+            {
+                float angle =
+                    index * MathF.PI * 0.25f;
+
+                float inner =
+                    innerRadius + 2.0f;
+
+                float outer =
+                    innerRadius +
+                    (index % 2 == 0
+                        ? 8.0f
+                        : 5.5f);
+
+                PointF start =
+                    new(
+                        center.X + MathF.Cos(angle) * inner,
+                        center.Y + MathF.Sin(angle) * inner);
+
+                PointF end =
+                    new(
+                        center.X + MathF.Cos(angle) * outer,
+                        center.Y + MathF.Sin(angle) * outer);
+
+                graphics.DrawLine(
+                    pen,
+                    start,
+                    end);
+            }
+
+            using var glowPen =
+                new Pen(
+                    Color.FromArgb(
+                        110,
+                        pen.Color),
+                    1.0f);
+
+            float glowRadius =
+                innerRadius + 7.0f;
+
+            graphics.DrawEllipse(
+                glowPen,
+                center.X - glowRadius,
+                center.Y - glowRadius,
+                glowRadius * 2.0f,
+                glowRadius * 2.0f);
         }
 
         private static void DrawArrowHead(

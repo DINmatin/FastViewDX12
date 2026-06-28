@@ -256,6 +256,12 @@ public sealed partial class MainForm
         _sceneSidebar.Visible =
             showSidebar;
 
+        if (_transformToolbar != null)
+        {
+            _transformToolbar.Visible =
+                showSidebar;
+        }
+
         _sceneSidebarToggleButton.Text =
             showSidebar
                 ? "×"
@@ -277,7 +283,11 @@ public sealed partial class MainForm
 
         PositionSceneSidebarToggle();
         _sceneSidebarToggleButton.BringToFront();
-        _transformToolbar?.BringToFront();
+
+        if (showSidebar)
+        {
+            _transformToolbar?.BringToFront();
+        }
     }
 
     /// <summary>
