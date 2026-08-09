@@ -120,7 +120,10 @@ public sealed class ThumbnailRenderForm : Form
 
         _renderer =
             new Dx12Renderer(
-                _renderPanel);
+                _renderPanel)
+            {
+                MaximumDecodedTextureSize = 512
+            };
 
         _renderPanel.HandleCreated +=
             (_, _) =>
@@ -163,19 +166,14 @@ public sealed class ThumbnailRenderForm : Form
         {
             _renderer.Initialize();
 
-            if (File.Exists(
-                DefaultEnvironmentMapPath))
-            {
-                _renderer.LoadEnvironmentMap(
-                    DefaultEnvironmentMapPath);
-            }
-
             SceneData scene =
-                GltfSceneLoader.LoadFromFile(
+                ModelSceneLoader.LoadFromFile(
                     _inputPath);
 
             _renderer.LoadScene(
                 scene);
+
+            scene.ReleaseEncodedTextureData();
 
             // Thumbnail previews use a transparent background and a
             // three-quarter view instead of the often uninformative

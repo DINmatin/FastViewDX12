@@ -5,6 +5,57 @@ namespace FastViewDX12;
 /// </summary>
 public sealed partial class Dx12Renderer
 {
+    public readonly record struct CameraState(
+        System.Numerics.Vector3 Target,
+        float Distance,
+        float Yaw,
+        float Pitch);
+
+    public CameraState CaptureCameraState()
+    {
+        _camera.GetState(
+            out System.Numerics.Vector3 target,
+            out float distance,
+            out float yaw,
+            out float pitch);
+
+        return new CameraState(target, distance, yaw, pitch);
+    }
+
+    public void RestoreCameraState(CameraState state)
+    {
+        _camera.SetState(
+            state.Target,
+            state.Distance,
+            state.Yaw,
+            state.Pitch);
+    }
+
+    public float PreparePreviewOrbit()
+    {
+        if (_scene == null ||
+            _scene.Meshes.Count == 0)
+        {
+            throw new InvalidOperationException(
+                "No model is currently loaded.");
+        }
+
+        _camera.FitToScene(_scene);
+        _camera.GetState(out _, out _, out float yaw, out _);
+        return yaw;
+    }
+
+    public void SetPreviewOrbitAngle(float yaw)
+    {
+        _camera.GetState(
+            out System.Numerics.Vector3 target,
+            out float distance,
+            out _,
+            out float pitch);
+
+        _camera.SetState(target, distance, yaw, pitch);
+    }
+
     /// <summary>
     /// Fits the orbit camera to the bounds of every loaded mesh.
     /// </summary>

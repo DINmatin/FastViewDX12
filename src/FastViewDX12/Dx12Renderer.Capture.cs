@@ -16,6 +16,108 @@ namespace FastViewDX12;
 /// </summary>
 public sealed partial class Dx12Renderer
 {
+    private sealed class VideoFrameCaptureRequest
+    {
+        public int Width { get; }
+
+        public int Height { get; }
+
+        public byte[]? Bgra32 { get; set; }
+
+        public Exception? Error { get; set; }
+
+        public VideoFrameCaptureRequest(int width, int height)
+        {
+            Width = width;
+            Height = height;
+        }
+    }
+
+    private VideoFrameCaptureRequest? _pendingVideoFrameCapture;
+
+    public byte[] CaptureVideoFrameBgra32(int width, int height)
+    {
+        if (!_initialized)
+        {
+            throw new InvalidOperationException("Renderer is not initialized.");
+        }
+
+        if (_scene == null || _scene.Meshes.Count == 0)
+        {
+            throw new InvalidOperationException("No model is currently loaded.");
+        }
+
+        if (width <= 0 || height <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(width),
+                "Video frame dimensions must be positive.");
+        }
+
+        if (_pendingPreviewCapture != null || _pendingVideoFrameCapture != null)
+        {
+            throw new InvalidOperationException("Another frame capture is already active.");
+        }
+
+        var request = new VideoFrameCaptureRequest(width, height);
+        _pendingVideoFrameCapture = request;
+        Render();
+
+        if (request.Error != null)
+        {
+            throw new InvalidOperationException("Video frame capture failed.", request.Error);
+        }
+
+        return request.Bgra32 ??
+            throw new InvalidOperationException("Video frame capture did not complete.");
+    }
+
+    private static byte[] ReadVideoFrameBgra32(
+        ID3D12Resource readbackBuffer,
+        uint rowPitch,
+        int sourceWidth,
+        int sourceHeight,
+        int outputWidth,
+        int outputHeight)
+    {
+        int mappedByteCount = checked((int)((ulong)rowPitch * (uint)sourceHeight));
+        Span<byte> source = readbackBuffer.Map<byte>(0, mappedByteCount);
+
+        try
+        {
+            byte[] output = new byte[checked(outputWidth * outputHeight * 4)];
+
+            for (int outputY = 0; outputY < outputHeight; outputY++)
+            {
+                int sourceY = Math.Min(
+                    sourceHeight - 1,
+                    outputY * sourceHeight / outputHeight);
+                int sourceRow = checked(sourceY * (int)rowPitch);
+                int destinationRow = checked(outputY * outputWidth * 4);
+
+                for (int outputX = 0; outputX < outputWidth; outputX++)
+                {
+                    int sourceX = Math.Min(
+                        sourceWidth - 1,
+                        outputX * sourceWidth / outputWidth);
+                    int sourcePixel = sourceRow + sourceX * 4;
+                    int destinationPixel = destinationRow + outputX * 4;
+
+                    output[destinationPixel] = source[sourcePixel + 2];
+                    output[destinationPixel + 1] = source[sourcePixel + 1];
+                    output[destinationPixel + 2] = source[sourcePixel];
+                    output[destinationPixel + 3] = 255;
+                }
+            }
+
+            return output;
+        }
+        finally
+        {
+            readbackBuffer.Unmap(0);
+        }
+    }
+
     private sealed class PreviewCaptureRequest
     {
         public string Path { get; }

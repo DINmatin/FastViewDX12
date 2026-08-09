@@ -1,22 +1,24 @@
 # FastView
 
-FastView is a lightweight Windows viewer and scene-assembly tool for **GLB** and **glTF** files. It uses WinForms and Direct3D 12, focuses on static-model workflows, and includes Windows Explorer thumbnail providers.
+FastView is a lightweight Windows viewer and scene-assembly tool for **GLB**, **glTF**, **FBX**, and **OBJ** files. It uses WinForms and Direct3D 12, focuses on static-model workflows, and includes Windows Explorer thumbnail providers.
 
 ![FastViewDX12 preview](docs/images/fastview-preview.png)
 
 ## Download
 
-**[Download the latest FastView installer](https://github.com/DINmatin/FastViewDX12/releases/latest/download/FastView_Setup_1.2.0.exe)**
+**[Download the latest FastView installer](https://github.com/DINmatin/FastViewDX12/releases/latest/download/FastView_Setup_1.3.0.exe)**
 
-Download the installer, start `FastView_Setup_1.2.0.exe`, and follow the setup instructions.
+Download the installer, start `FastView_Setup_1.3.0.exe`, and follow the setup instructions.
 
-After installation, GLB and glTF files can be opened with FastView and displayed as thumbnails in Windows Explorer.
+After installation, GLB, glTF, FBX, and OBJ files can be opened with FastView and displayed as thumbnails in Windows Explorer.
 
 ## Current features
 
 ### Viewing and scene assembly
 
-- Open `.glb` and `.gltf` files from the command line, drag-and-drop, **Open with**, or the File menu.
+- Open `.glb`, `.gltf`, `.fbx`, and `.obj` files from the command line, drag-and-drop, **Open with**, or the File menu.
+- Large textures appear quickly at 512 px and are refined in the background after the first frame.
+- A large drop overlay reports `DROP HERE` or `WRONG FORMAT` before a file is released.
 - Add multiple models to one scene without replacing the models already loaded.
 - Select models directly in the viewport or from the scene sidebar.
 - Focus the selected model with `F`; when nothing is selected, `F` fits the complete scene.
@@ -52,13 +54,15 @@ After installation, GLB and glTF files can be opened with FastView and displayed
 - Export the assembled multi-model scene as a self-contained `.glb` file.
 - Current model transformations are included in the exported geometry.
 - Viewer-only helpers and effects such as the grid, gizmos, camera, background, bloom, and shadows are not exported.
+- Create an eight-second Full-HD H.264 preview video with a smooth 360-degree orbit using `Ctrl+Shift+V`.
+- Preview videos are saved beside the selected source model as `<model-name>_preview.mp4`.
 
 ### Windows Explorer integration
 
 - Transparent Explorer thumbnails with automatic crop and a tighter model fit.
 - 45-degree three-quarter thumbnail camera view.
 - `.glb` thumbnail support through a stream-based provider.
-- `.gltf` thumbnail support, including adjacent `.bin` and texture files, through a file-based provider.
+- `.gltf`, `.fbx`, and `.obj` thumbnail support, including adjacent resource files, through a file-based provider.
 - Multi-resolution GLB/glTF fallback icon from 16 to 256 px.
 - Inno Setup installer build.
 
@@ -73,6 +77,7 @@ After installation, GLB and glTF files can be opened with FastView and displayed
 | `F` | Focus selection, or fit the complete scene |
 | `G` | Toggle ground grid |
 | `Ctrl+Z` | Undo last transform |
+| `Ctrl+Shift+V` | Create 360-degree preview video |
 | `Shift` while rotating | Snap to 90-degree steps |
 
 ## Requirements
@@ -102,7 +107,7 @@ dotnet build .\FastView.slnx -c Release
 Create a self-contained release payload and ZIP:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\build\BuildRelease.ps1 -Version 1.2.0
+powershell -ExecutionPolicy Bypass -File .\build\BuildRelease.ps1 -Version 1.3.0
 ```
 
 Create the Windows installer:

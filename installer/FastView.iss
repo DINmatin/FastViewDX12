@@ -1,6 +1,6 @@
 #define MyAppName "FastView"
 #ifndef MyAppVersion
-  #define MyAppVersion "1.2.0"
+  #define MyAppVersion "1.3.0"
 #endif
 #define MyAppExeName "FastViewDX12.exe"
 #define MyProviderComHost "FastView.ThumbnailProvider.comhost.dll"
@@ -34,7 +34,7 @@ RestartApplications=no
 SetupLogging=yes
 VersionInfoVersion={#MyAppVersion}.0
 VersionInfoCompany=FastView
-VersionInfoDescription=FastView 3D Viewer and GLB/glTF thumbnail provider
+VersionInfoDescription=FastView 3D Viewer and model thumbnail provider
 VersionInfoProductName=FastView
 VersionInfoProductVersion={#MyAppVersion}
 
@@ -57,8 +57,10 @@ Source: "Payload\{#MyProviderComHost}"; DestDir: "{app}"; Flags: ignoreversion r
 ; Explorer thumbnail handlers
 Root: HKLM64; Subkey: "Software\Classes\SystemFileAssociations\.glb\ShellEx\{{E357FCCD-A995-4576-B01F-234630154E96}"; ValueType: string; ValueName: ""; ValueData: "{{A2A86C88-5B89-4D5E-92B3-7A6CF4E0A1B7}"; Flags: uninsdeletevalue
 Root: HKLM64; Subkey: "Software\Classes\SystemFileAssociations\.gltf\ShellEx\{{E357FCCD-A995-4576-B01F-234630154E96}"; ValueType: string; ValueName: ""; ValueData: "{{6B07920A-CFEC-42E6-B718-73A199156EFD}"; Flags: uninsdeletevalue
+Root: HKLM64; Subkey: "Software\Classes\SystemFileAssociations\.fbx\ShellEx\{{E357FCCD-A995-4576-B01F-234630154E96}"; ValueType: string; ValueName: ""; ValueData: "{{6B07920A-CFEC-42E6-B718-73A199156EFD}"; Flags: uninsdeletevalue
+Root: HKLM64; Subkey: "Software\Classes\SystemFileAssociations\.obj\ShellEx\{{E357FCCD-A995-4576-B01F-234630154E96}"; ValueType: string; ValueName: ""; ValueData: "{{6B07920A-CFEC-42E6-B718-73A199156EFD}"; Flags: uninsdeletevalue
 
-; glTF may reference adjacent .bin and texture files. The file-based handler
+; glTF, FBX, and OBJ may reference adjacent resources. The file-based handler
 ; therefore needs the original path instead of an isolated file stream.
 Root: HKLM64; Subkey: "Software\Classes\CLSID\{{6B07920A-CFEC-42E6-B718-73A199156EFD}"; ValueType: dword; ValueName: "DisableProcessIsolation"; ValueData: "1"; Flags: uninsdeletevalue
 
@@ -71,6 +73,8 @@ Root: HKLM64; Subkey: "Software\Classes\Applications\{#MyAppExeName}"; ValueType
 Root: HKLM64; Subkey: "Software\Classes\Applications\{#MyAppExeName}\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""
 Root: HKLM64; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".glb"; ValueData: ""
 Root: HKLM64; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".gltf"; ValueData: ""
+Root: HKLM64; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".fbx"; ValueData: ""
+Root: HKLM64; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".obj"; ValueData: ""
 
 Root: HKLM64; Subkey: "Software\Microsoft\Windows\CurrentVersion\App Paths\{#MyAppExeName}"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName}"; Flags: uninsdeletekey
 Root: HKLM64; Subkey: "Software\Microsoft\Windows\CurrentVersion\App Paths\{#MyAppExeName}"; ValueType: string; ValueName: "Path"; ValueData: "{app}"

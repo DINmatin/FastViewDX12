@@ -29,6 +29,25 @@ public sealed class SceneData
 
     /// <summary>Gets the flattened glTF mesh primitives ready for GPU upload.</summary>
     public List<MeshData> Meshes { get; } = new();
+
+    public void ReleaseEncodedTextureData()
+    {
+        foreach (MaterialData material in Materials)
+        {
+            material.BaseColorTextureBytes = null;
+            material.NormalTextureBytes = null;
+            material.MetallicRoughnessTextureBytes = null;
+            material.EmissiveTextureBytes = null;
+        }
+    }
+}
+
+public enum MaterialTextureKind
+{
+    BaseColor,
+    Normal,
+    MetallicRoughness,
+    Emissive
 }
 
 /// <summary>

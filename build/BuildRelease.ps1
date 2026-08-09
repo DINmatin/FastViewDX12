@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "1.0.1",
+    [string]$Version = "1.3.0",
     [switch]$KeepSymbols
 )
 
@@ -69,6 +69,10 @@ Get-ChildItem $payloadOutput -Include *.error.txt,manual-test*.png -Recurse -Err
 $requiredFiles = @(
     "FastViewDX12.exe",
     "FastViewDX12.dll",
+    "assimp.dll",
+    "SharpAssimp.dll",
+    "Vortice.MediaFoundation.dll",
+    "ThirdPartyNotices\SharpAssimp-LICENSE.txt",
     "FastView.ThumbnailProvider.comhost.dll",
     "FastView.ThumbnailProvider.dll",
     "coreclr.dll",

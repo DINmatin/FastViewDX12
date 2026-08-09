@@ -21,6 +21,24 @@ public sealed partial class MainForm : Form
 
     private readonly SceneDocument _sceneDocument = new();
 
+    private OperationProgressOverlay _progressOverlay = null!;
+
+    private DropFeedbackOverlay _dropOverlay = null!;
+
+    private CancellationTokenSource? _loadCancellation;
+
+    private CancellationTokenSource? _textureRefinementCancellation;
+
+    private CancellationTokenSource? _videoExportCancellation;
+
+    private Task? _textureRefinementTask;
+
+    private bool _isModelLoadInProgress;
+
+    private bool _isVideoExportInProgress;
+
+    private bool _closeWhenIdle;
+
     private bool _isRotatingLight;
 
     private readonly string _stateFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FastViewDX12");
@@ -71,6 +89,19 @@ public sealed partial class MainForm : Form
 
 
         _renderer = new Dx12Renderer(_renderPanel);
+
+        _progressOverlay = new OperationProgressOverlay();
+        _dropOverlay = new DropFeedbackOverlay();
+
+        _progressOverlay.CancelRequested +=
+            (_, _) =>
+            {
+                _loadCancellation?.Cancel();
+                _videoExportCancellation?.Cancel();
+            };
+
+        _renderPanel.Controls.Add(_progressOverlay);
+        _renderPanel.Controls.Add(_dropOverlay);
 
         _menuStrip =
             CreateMainMenu();
@@ -127,7 +158,14 @@ public sealed partial class MainForm : Form
                 PositionSceneSidebarToggle();
             };
         _renderPanel.DragEnter += RenderPanel_DragEnter;
+        _renderPanel.DragOver += RenderPanel_DragEnter;
+        _renderPanel.DragLeave += RenderPanel_DragLeave;
         _renderPanel.DragDrop += RenderPanel_DragDrop;
+
+        _dropOverlay.DragEnter += RenderPanel_DragEnter;
+        _dropOverlay.DragOver += RenderPanel_DragEnter;
+        _dropOverlay.DragLeave += RenderPanel_DragLeave;
+        _dropOverlay.DragDrop += RenderPanel_DragDrop;
 
         _renderPanel.MouseDown += RenderPanel_MouseDown;
         _renderPanel.MouseMove += RenderPanel_MouseMove;
@@ -145,6 +183,7 @@ public sealed partial class MainForm : Form
             };
 
         Application.Idle += OnApplicationIdle;
+        FormClosing += MainForm_FormClosing;
     }
 
     /// <summary>
@@ -189,6 +228,12 @@ public sealed partial class MainForm : Form
     /// </summary>
     private void OnApplicationIdle(object? sender, EventArgs e)
     {
+        if (_isModelLoadInProgress ||
+            _isVideoExportInProgress)
+        {
+            return;
+        }
+
         while (AppStillIdle)
         {
             _renderer.Render();
@@ -214,6 +259,9 @@ public sealed partial class MainForm : Form
     {
         if (disposing)
         {
+            _textureRefinementCancellation?.Cancel();
+            _loadCancellation?.Cancel();
+            _videoExportCancellation?.Cancel();
             SaveViewerSettingsNow();
             DisposeMoveGizmoOverlay();
 

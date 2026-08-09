@@ -20,11 +20,11 @@ public sealed partial class MainForm
     /// </summary>
     /// <param name="path">Model path selected by the user, drag-and-drop, or startup recovery.</param>
     /// <param name="rememberAsLast">Whether the path becomes the next startup model.</param>
-    private void LoadModelFromPath(
+    private async void LoadModelFromPath(
         string path,
         bool rememberAsLast = true)
     {
-        LoadModelFromPath(
+        await LoadModelFromPathAsync(
             path,
             addToScene: false,
             rememberAsLast: rememberAsLast);
@@ -33,10 +33,10 @@ public sealed partial class MainForm
     /// <summary>
     /// Validates and appends a GLB or glTF file without removing existing models.
     /// </summary>
-    private void AddModelFromPath(
+    private async void AddModelFromPath(
         string path)
     {
-        LoadModelFromPath(
+        await LoadModelFromPathAsync(
             path,
             addToScene: true,
             rememberAsLast: false);
@@ -57,9 +57,12 @@ public sealed partial class MainForm
                         : "Open model",
 
                 Filter =
+                    "Supported models (*.glb;*.gltf;*.fbx;*.obj)|*.glb;*.gltf;*.fbx;*.obj|" +
                     "glTF models (*.glb;*.gltf)|*.glb;*.gltf|" +
                     "GLB files (*.glb)|*.glb|" +
-                    "glTF files (*.gltf)|*.gltf",
+                    "glTF files (*.gltf)|*.gltf|" +
+                    "Autodesk FBX (*.fbx)|*.fbx|" +
+                    "Wavefront OBJ (*.obj)|*.obj",
 
                 CheckFileExists =
                     true,
@@ -90,21 +93,55 @@ public sealed partial class MainForm
         }
     }
 
-    private void LoadModelFromPath(
+    private async Task LoadModelFromPathAsync(
         string path,
         bool addToScene,
         bool rememberAsLast)
     {
-        if (!IsSupportedModelPath(path))
+        if (!IsSupportedModelPath(path) ||
+            _isModelLoadInProgress ||
+            _isVideoExportInProgress)
         {
             return;
         }
 
+        CancelTextureRefinement();
+
+        string fileName = Path.GetFileName(path);
+        _isModelLoadInProgress = true;
+        _loadCancellation = new CancellationTokenSource();
+        CancellationToken cancellationToken = _loadCancellation.Token;
+        var performance = new ModelLoadPerformanceReport(path);
+        SceneData? loadedScene = null;
+        bool loadCompleted = false;
+
+        _menuStrip.Enabled = false;
+        _progressOverlay.BeginOperation("LOADING MODEL", fileName);
+        _dropOverlay.HideFeedback();
+
         try
         {
-            SceneData loadedScene =
-                GltfSceneLoader.LoadFromFile(
-                    path);
+            var progress = new Progress<ModelLoadProgress>(
+                value => _progressOverlay.UpdateProgress(value));
+
+            loadedScene = await Task.Run(
+                () => ModelSceneLoader.LoadFromFile(
+                    path,
+                    progress,
+                    performance,
+                    cancellationToken),
+                cancellationToken);
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            _progressOverlay.UpdateProgress(
+                new ModelLoadProgress(
+                    ModelLoadStage.UploadingToGpu,
+                    "Uploading scene to GPU",
+                    fileName));
+
+            _renderer.MaximumDecodedTextureSize =
+                InitialTextureMaximumDimension;
 
             if (addToScene)
             {
@@ -134,10 +171,17 @@ public sealed partial class MainForm
                 Directory.CreateDirectory(
                     _stateFolder);
 
-                File.WriteAllText(
+                await File.WriteAllTextAsync(
                     LastModelPathFile,
-                    path);
+                    path,
+                    CancellationToken.None);
             }
+
+            loadCompleted = true;
+        }
+        catch (OperationCanceledException)
+        {
+            Debug.WriteLine($"Model load cancelled: {path}");
         }
         catch (Exception ex)
         {
@@ -152,6 +196,29 @@ public sealed partial class MainForm
                     : "Model could not be loaded",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
+        }
+        finally
+        {
+            performance.Publish();
+            _loadCancellation?.Dispose();
+            _loadCancellation = null;
+            _isModelLoadInProgress = false;
+
+            if (!IsDisposed)
+            {
+                _progressOverlay.EndOperation();
+                _menuStrip.Enabled = true;
+                _renderer.Resize();
+            }
+
+            if (loadCompleted &&
+                loadedScene != null &&
+                !IsDisposed)
+            {
+                StartTextureRefinement(fileName);
+            }
+
+            CloseWhenIdleIfRequested();
         }
     }
 
@@ -199,6 +266,10 @@ public sealed partial class MainForm
             selectedModel.Id);
 
         RebuildRenderedScene();
+        if (_sceneDocument.Models.Count > 0)
+        {
+            StartTextureRefinement(_sceneDocument.Models[0].Name);
+        }
         RefreshSceneSidebar();
         UpdateWindowTitle();
     }
@@ -290,15 +361,6 @@ public sealed partial class MainForm
             return false;
         }
 
-        string extension =
-            Path.GetExtension(path);
-
-        return
-            extension.Equals(
-                ".glb",
-                StringComparison.OrdinalIgnoreCase) ||
-            extension.Equals(
-                ".gltf",
-                StringComparison.OrdinalIgnoreCase);
+        return ModelSceneLoader.IsSupportedPath(path);
     }
 }

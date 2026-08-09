@@ -209,13 +209,17 @@ public sealed partial class Dx12Renderer
         PreviewCaptureRequest? previewRequest =
             _pendingPreviewCapture;
 
+        VideoFrameCaptureRequest? videoFrameRequest =
+            _pendingVideoFrameCapture;
+
         ID3D12Resource? previewReadbackBuffer =
             null;
 
         uint previewRowPitch =
             0;
 
-        if (previewRequest != null)
+        if (previewRequest != null ||
+            videoFrameRequest != null)
         {
             previewReadbackBuffer =
                 CreatePreviewReadbackBuffer(
@@ -324,6 +328,36 @@ public sealed partial class Dx12Renderer
                 {
                     _pendingPreviewCapture =
                         null;
+                }
+            }
+        }
+        else if (videoFrameRequest != null &&
+                 previewReadbackBuffer != null)
+        {
+            try
+            {
+                videoFrameRequest.Bgra32 =
+                    ReadVideoFrameBgra32(
+                        previewReadbackBuffer,
+                        previewRowPitch,
+                        width,
+                        height,
+                        videoFrameRequest.Width,
+                        videoFrameRequest.Height);
+            }
+            catch (Exception ex)
+            {
+                videoFrameRequest.Error = ex;
+            }
+            finally
+            {
+                previewReadbackBuffer.Dispose();
+
+                if (ReferenceEquals(
+                    _pendingVideoFrameCapture,
+                    videoFrameRequest))
+                {
+                    _pendingVideoFrameCapture = null;
                 }
             }
         }

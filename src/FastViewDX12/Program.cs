@@ -6,14 +6,8 @@ using System.Windows.Forms;
 
 namespace FastViewDX12;
 
-/// <summary>
-/// Selects interactive viewer startup or isolated Explorer thumbnail generation from command-line arguments.
-/// </summary>
 internal static class Program
 {
-    /// <summary>
-    /// Application entry point. Thumbnail mode is selected before any ToolStrip or SystemEvents initialization.
-    /// </summary>
     [STAThread]
     private static void Main(
         string[] args)
@@ -24,11 +18,23 @@ internal static class Program
                 "--thumbnail",
                 StringComparison.OrdinalIgnoreCase);
 
+        bool previewVideoMode =
+            args.Length > 0 &&
+            args[0].Equals(
+                "--preview-video",
+                StringComparison.OrdinalIgnoreCase);
+
         if (thumbnailMode)
         {
             RunThumbnailMode(
                 args);
 
+            return;
+        }
+
+        if (previewVideoMode)
+        {
+            RunPreviewVideoMode(args);
             return;
         }
 
@@ -44,9 +50,142 @@ internal static class Program
                 startupModelPath));
     }
 
-    /// <summary>
-    /// Validates the thumbnail command and runs a minimal hidden render form.
-    /// </summary>
+    private static void RunPreviewVideoMode(string[] args)
+    {
+        TryWriteThumbnailStartupLog(args);
+
+        try
+        {
+            if (!TryParsePreviewVideoCommand(
+                args,
+                out string inputPath,
+                out string outputPath,
+                out int width,
+                out int height,
+                out int framesPerSecond,
+                out int durationSeconds,
+                out string errorMessage))
+            {
+                Environment.ExitCode = 2;
+                TryWriteThumbnailError(
+                    GetOutputPathIfAvailable(args),
+                    errorMessage);
+                return;
+            }
+
+            Application.Run(
+                new PreviewVideoRenderForm(
+                    inputPath,
+                    outputPath,
+                    width,
+                    height,
+                    framesPerSecond,
+                    durationSeconds));
+        }
+        catch (Exception exception)
+        {
+            Environment.ExitCode = 1;
+            TryWriteThumbnailError(
+                GetOutputPathIfAvailable(args),
+                exception.ToString());
+        }
+    }
+
+    private static bool TryParsePreviewVideoCommand(
+        string[] args,
+        out string inputPath,
+        out string outputPath,
+        out int width,
+        out int height,
+        out int framesPerSecond,
+        out int durationSeconds,
+        out string errorMessage)
+    {
+        inputPath = string.Empty;
+        outputPath = string.Empty;
+        width = 1920;
+        height = 1080;
+        framesPerSecond = 30;
+        durationSeconds = 8;
+        errorMessage = string.Empty;
+
+        if (args.Length < 3 || args.Length > 7)
+        {
+            errorMessage =
+                "Usage: FastViewDX12.exe --preview-video " +
+                "\"input-model\" \"output.mp4\" " +
+                "[width] [height] [fps] [seconds]";
+            return false;
+        }
+
+        try
+        {
+            inputPath = Path.GetFullPath(args[1]);
+            outputPath = Path.GetFullPath(args[2]);
+        }
+        catch (Exception exception)
+        {
+            errorMessage = $"Invalid path: {exception.Message}";
+            return false;
+        }
+
+        if (!File.Exists(inputPath) || !ModelSceneLoader.IsSupportedPath(inputPath))
+        {
+            errorMessage = "The input model does not exist or has an unsupported format.";
+            return false;
+        }
+
+        if (!Path.GetExtension(outputPath).Equals(
+            ".mp4",
+            StringComparison.OrdinalIgnoreCase))
+        {
+            errorMessage = "The output file must have the extension .mp4.";
+            return false;
+        }
+
+        if (args.Length >= 4 && !TryParseEvenValue(args[3], 64, 3840, out width))
+        {
+            errorMessage = "Width must be an even number between 64 and 3840.";
+            return false;
+        }
+
+        if (args.Length >= 5 && !TryParseEvenValue(args[4], 64, 2160, out height))
+        {
+            errorMessage = "Height must be an even number between 64 and 2160.";
+            return false;
+        }
+
+        if (args.Length >= 6 &&
+            (!int.TryParse(args[5], out framesPerSecond) ||
+             framesPerSecond is < 1 or > 60))
+        {
+            errorMessage = "FPS must be a number between 1 and 60.";
+            return false;
+        }
+
+        if (args.Length >= 7 &&
+            (!int.TryParse(args[6], out durationSeconds) ||
+             durationSeconds is < 1 or > 60))
+        {
+            errorMessage = "Duration must be a number between 1 and 60 seconds.";
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool TryParseEvenValue(
+        string value,
+        int minimum,
+        int maximum,
+        out int result)
+    {
+        return int.TryParse(value, out result) &&
+            result >= minimum &&
+            result <= maximum &&
+            (result & 1) == 0;
+    }
+
     private static void RunThumbnailMode(
         string[] args)
     {
@@ -74,9 +213,9 @@ internal static class Program
                 return;
             }
 
-            // Do not call ApplicationConfiguration.Initialize() in thumbnail mode:
-            // Explorer thumbnail generation needs neither visual styles
-            // nor ToolStrip/SystemEvents initialization.
+            // Absichtlich kein ApplicationConfiguration.Initialize():
+            // Der Explorer-Thumbnailprozess benötigt weder Visual Styles
+            // noch ToolStrip-/SystemEvents-Initialisierung.
             Application.Run(
                 new ThumbnailRenderForm(
                     inputPath,
@@ -96,9 +235,6 @@ internal static class Program
         }
     }
 
-    /// <summary>
-    /// Parses and validates source path, output path, and requested dimensions.
-    /// </summary>
     private static bool TryParseThumbnailCommand(
         string[] args,
         out string inputPath,
@@ -127,7 +263,7 @@ internal static class Program
         {
             errorMessage =
                 "Usage: FastViewDX12.exe --thumbnail " +
-                "\"input.glb\" \"output.png\" " +
+                "\"input-model\" \"output.png\" " +
                 "[width] [height]";
 
             return false;
@@ -160,22 +296,10 @@ internal static class Program
             return false;
         }
 
-        string inputExtension =
-            Path.GetExtension(
-                inputPath);
-
-        bool supportedInput =
-            inputExtension.Equals(
-                ".glb",
-                StringComparison.OrdinalIgnoreCase) ||
-            inputExtension.Equals(
-                ".gltf",
-                StringComparison.OrdinalIgnoreCase);
-
-        if (!supportedInput)
+        if (!ModelSceneLoader.IsSupportedPath(inputPath))
         {
             errorMessage =
-                "The input file must be a GLB or glTF file.";
+                "The input file must be a GLB, glTF, FBX, or OBJ file.";
 
             return false;
         }
@@ -232,9 +356,6 @@ internal static class Program
         return true;
     }
 
-    /// <summary>
-    /// Accepts thumbnail dimensions within the supported safety limits.
-    /// </summary>
     private static bool TryParseDimension(
         string value,
         out int result)
@@ -247,9 +368,6 @@ internal static class Program
             result <= 2048;
     }
 
-    /// <summary>
-    /// Returns a normalized output path for diagnostics when command parsing fails.
-    /// </summary>
     private static string? GetOutputPathIfAvailable(
         string[] args)
     {
@@ -271,9 +389,6 @@ internal static class Program
         }
     }
 
-    /// <summary>
-    /// Writes a best-effort thumbnail error file without masking the original failure.
-    /// </summary>
     private static void TryWriteThumbnailError(
         string? outputPath,
         string text)
@@ -297,9 +412,6 @@ internal static class Program
         }
     }
 
-    /// <summary>
-    /// Records executable, assembly, working-directory, and argument details for COM troubleshooting.
-    /// </summary>
     private static void TryWriteThumbnailStartupLog(
         string[] args)
     {

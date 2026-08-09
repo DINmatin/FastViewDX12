@@ -18,15 +18,15 @@ public sealed partial class Dx12Renderer
 
         public uint DescriptorStart { get; }
 
-        public DecodedTexture DecodedBaseColor { get; }
+        public DecodedTexture DecodedBaseColor { get; private set; }
 
-        public ID3D12Resource BaseColorTexture { get; }
+        public ID3D12Resource BaseColorTexture { get; private set; }
 
-        public ID3D12Resource NormalTexture { get; }
+        public ID3D12Resource NormalTexture { get; private set; }
 
-        public ID3D12Resource MetallicRoughnessTexture { get; }
+        public ID3D12Resource MetallicRoughnessTexture { get; private set; }
 
-        public ID3D12Resource EmissiveTexture { get; }
+        public ID3D12Resource EmissiveTexture { get; private set; }
 
         public GpuMaterial(
             MaterialData source,
@@ -52,6 +52,43 @@ public sealed partial class Dx12Renderer
             NormalTexture.Dispose();
             MetallicRoughnessTexture.Dispose();
             EmissiveTexture.Dispose();
+        }
+
+        public ID3D12Resource ReplaceTexture(
+            MaterialTextureKind kind,
+            ID3D12Resource replacement,
+            DecodedTexture decodedTexture)
+        {
+            ID3D12Resource previous;
+
+            switch (kind)
+            {
+                case MaterialTextureKind.BaseColor:
+                    previous = BaseColorTexture;
+                    BaseColorTexture = replacement;
+                    DecodedBaseColor = decodedTexture;
+                    break;
+
+                case MaterialTextureKind.Normal:
+                    previous = NormalTexture;
+                    NormalTexture = replacement;
+                    break;
+
+                case MaterialTextureKind.MetallicRoughness:
+                    previous = MetallicRoughnessTexture;
+                    MetallicRoughnessTexture = replacement;
+                    break;
+
+                case MaterialTextureKind.Emissive:
+                    previous = EmissiveTexture;
+                    EmissiveTexture = replacement;
+                    break;
+
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(kind));
+            }
+
+            return previous;
         }
     }
 
@@ -221,7 +258,7 @@ public sealed partial class Dx12Renderer
             emissiveTexture);
     }
 
-    private static DecodedTexture DecodeTextureOrFallback(
+    private DecodedTexture DecodeTextureOrFallback(
         byte[]? encodedBytes,
         DecodedTexture fallback,
         string textureName)
@@ -240,7 +277,8 @@ public sealed partial class Dx12Renderer
         {
             DecodedTexture decoded =
                 TextureDecoder.Decode(
-                    encodedBytes);
+                    encodedBytes,
+                    MaximumDecodedTextureSize);
 
             Debug.WriteLine(
                 $"{textureName} loaded: " +
@@ -309,6 +347,44 @@ public sealed partial class Dx12Renderer
             handle);
 
         return texture;
+    }
+
+    public bool ReplaceMaterialTexture(
+        MaterialData expectedMaterial,
+        MaterialTextureKind kind,
+        DecodedTexture decodedTexture)
+    {
+        ArgumentNullException.ThrowIfNull(expectedMaterial);
+        ArgumentNullException.ThrowIfNull(decodedTexture);
+
+        GpuMaterial? material =
+            _gpuMaterials.FirstOrDefault(
+                candidate => ReferenceEquals(candidate.Source, expectedMaterial));
+
+        if (material == null)
+        {
+            return false;
+        }
+
+        uint textureSlot = kind switch
+        {
+            MaterialTextureKind.BaseColor => BaseColorTextureSlot,
+            MaterialTextureKind.Normal => NormalTextureSlot,
+            MaterialTextureKind.MetallicRoughness => MetallicRoughnessTextureSlot,
+            MaterialTextureKind.Emissive => EmissiveTextureSlot,
+            _ => throw new ArgumentOutOfRangeException(nameof(kind))
+        };
+
+        ID3D12Resource replacement =
+            CreateTexture(
+                decodedTexture,
+                material.DescriptorStart + textureSlot);
+
+        ID3D12Resource previous =
+            material.ReplaceTexture(kind, replacement, decodedTexture);
+
+        previous.Dispose();
+        return true;
     }
 
     /// <summary>

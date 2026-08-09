@@ -4,6 +4,32 @@
 
 No unreleased changes yet.
 
+## 1.3.0 - 2026-08-09
+
+### Added
+
+* Added FBX import through SharpAssimp/Assimp, including embedded and external textures.
+* Added a managed OBJ/MTL importer with normals, tangents, UVs, materials, and texture maps.
+* Added file-menu, command-line, drag-and-drop, and thumbnail support for FBX and OBJ.
+* Added a large `DROP HERE` / `WRONG FORMAT` drag-feedback overlay.
+* Added cancellable model-load progress with readable loading stages and timing diagnostics.
+* Added native Windows Media Foundation H.264/MP4 preview-video export.
+* Added `Ctrl+Shift+V` to create an eight-second Full-HD 360-degree preview beside the selected model.
+* Added `--preview-video` for automated preview generation.
+
+### Changed
+
+* Large textures initially decode to 512 px so the first frame appears sooner, then refine in the background.
+* Explorer thumbnails use 512 px texture decoding and skip the full EXR environment load.
+* Texture decoding now uses Windows Imaging Component with a GDI+ fallback.
+
+### Tested with
+
+* `FastViewDemo.glb`
+* OBJ/MTL geometry and material fixtures
+* A 334.66 MB FBX with 35 embedded textures
+* 1920 x 1080, 30 FPS, eight-second H.264 preview-video export
+
 ## 1.2.0 - 2026-06-28
 
 ### Added

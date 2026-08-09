@@ -5,10 +5,13 @@ FastView restores the following dependencies from NuGet. Their own license texts
 | Package | Version in project | License / notes |
 |---|---:|---|
 | SharpGLTF.Core | 1.0.6 | MIT |
+| SharpAssimp | 6.0.12 | MIT; includes the redistributable Assimp native library, and its license is copied into binary releases |
 | TinyEXR.NET | 1.0.0 | MIT; wrapper around TinyEXR, whose bundled notices must also be retained where required |
 | Vortice.Direct3D12 | 3.8.3 | MIT |
+| Vortice.Direct2D1 / WIC | 3.8.3 | MIT |
 | Vortice.DirectX | 3.8.3 | MIT |
 | Vortice.DXGI | 3.8.3 | MIT |
+| Vortice.MediaFoundation | 3.8.3 | MIT; H.264 encoding uses the Windows Media Foundation runtime |
 | Microsoft.Direct3D.DXC | 1.9.2602.24 | Package contains MIT- and LLVM-licensed components; retain the license files supplied by the package where redistribution requires it |
 | System.Drawing.Common | 10.0.0 | Part of the .NET libraries; see the license supplied with the package/runtime |
 

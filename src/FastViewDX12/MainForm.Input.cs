@@ -27,6 +27,11 @@ public sealed partial class MainForm
         object? sender,
         MouseEventArgs e)
     {
+        if (_isVideoExportInProgress)
+        {
+            return;
+        }
+
         if (e.Button == MouseButtons.Left &&
             TryBeginMoveGizmoDrag(
                 e.Location))
@@ -100,6 +105,11 @@ public sealed partial class MainForm
         object? sender,
         MouseEventArgs e)
     {
+        if (_isVideoExportInProgress)
+        {
+            return;
+        }
+
         if (UpdateMoveGizmoDrag(
                 e.Location))
         {
@@ -249,6 +259,11 @@ public sealed partial class MainForm
         object? sender,
         MouseEventArgs e)
     {
+        if (_isVideoExportInProgress)
+        {
+            return;
+        }
+
         _renderer.OnCameraMouseWheel(
             e.Delta);
     }
@@ -260,6 +275,8 @@ public sealed partial class MainForm
         object? sender,
         DragEventArgs e)
     {
+        string? fileName = null;
+
         if (e.Data?.GetDataPresent(
                 DataFormats.FileDrop) == true)
         {
@@ -269,13 +286,11 @@ public sealed partial class MainForm
 
             if (files is { Length: 1 })
             {
-                string extension =
-                    Path.GetExtension(
-                        files[0])
-                    .ToLowerInvariant();
+                fileName = Path.GetFileName(files[0]);
+                bool isValid = IsSupportedModelPath(files[0]);
+                _dropOverlay.ShowFeedback(isValid, fileName);
 
-                if (extension == ".glb" ||
-                    extension == ".gltf")
+                if (isValid)
                 {
                     e.Effect =
                         DragDropEffects.Copy;
@@ -285,8 +300,16 @@ public sealed partial class MainForm
             }
         }
 
+        _dropOverlay.ShowFeedback(false, fileName);
         e.Effect =
             DragDropEffects.None;
+    }
+
+    private void RenderPanel_DragLeave(
+        object? sender,
+        EventArgs e)
+    {
+        _dropOverlay.HideFeedback();
     }
 
     /// <summary>
@@ -296,6 +319,8 @@ public sealed partial class MainForm
         object? sender,
         DragEventArgs e)
     {
+        _dropOverlay.HideFeedback();
+
         try
         {
             string[]? files =
@@ -332,6 +357,12 @@ public sealed partial class MainForm
         object? sender,
         KeyEventArgs e)
     {
+        if (_isModelLoadInProgress ||
+            _isVideoExportInProgress)
+        {
+            return;
+        }
+
         if (e.Control &&
             !e.Alt &&
             e.KeyCode == Keys.Z)

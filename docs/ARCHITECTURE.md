@@ -6,9 +6,11 @@ FastView is intentionally split into two processes. The interactive viewer owns 
 
 - `Program.cs` selects interactive or `--thumbnail` startup before WinForms visual-style initialization.
 - `MainForm*.cs` contains only the WinForms shell: menus, dialogs, input routing, model selection, and the idle render loop.
-- `GltfSceneLoader.cs` converts SharpGLTF objects into renderer-neutral `SceneData`.
+- `ModelSceneLoader.cs` dispatches GLB/glTF, FBX, and OBJ input into renderer-neutral `SceneData`.
+- `GltfSceneLoader.cs`, `AssimpFbxSceneLoader.cs`, and `ObjSceneLoader.cs` own their respective parsing paths.
 - `Dx12Renderer.cs` owns shared state and disposal. Focused partial files contain device setup, scene upload, background rendering, frame rendering, interaction, and PNG capture.
 - `CameraController.cs` and `LightController.cs` contain interaction math without Direct3D resource ownership.
+- `MediaFoundationVideoEncoder.cs` writes native Windows H.264/MP4 preview videos without shipping FFmpeg.
 - `GpuTextureUploader.cs` and `GpuHdrTextureUploader.cs` stage decoded images into GPU resources.
 
 ## `FastView.ThumbnailProvider`
@@ -29,7 +31,7 @@ FastView is intentionally split into two processes. The interactive viewer owns 
 
 1. WinForms creates a native host handle.
 2. `Dx12Renderer.Initialize()` creates device and swap-chain resources.
-3. `GltfSceneLoader.LoadFromFile()` creates CPU scene data.
+3. `ModelSceneLoader.LoadFromFile()` creates CPU scene data.
 4. `Dx12Renderer.LoadScene()` uploads materials and mesh buffers.
 5. `Render()` draws the background, opaque queue, and transparent queue.
 6. A pending preview request copies the backbuffer into a readback buffer and writes a cropped PNG.

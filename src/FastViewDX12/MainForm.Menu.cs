@@ -83,6 +83,22 @@ public sealed partial class MainForm
                 ExportPreviewPng();
             };
 
+        var exportPreviewVideoItem =
+            new ToolStripMenuItem(
+                "Create preview video...")
+            {
+                ShortcutKeys =
+                    Keys.Control |
+                    Keys.Shift |
+                    Keys.V
+            };
+
+        exportPreviewVideoItem.Click +=
+            async (_, _) =>
+            {
+                await CreatePreviewVideoAsync();
+            };
+
         fileMenu.DropDownItems.Add(
             openModelItem);
 
@@ -98,12 +114,20 @@ public sealed partial class MainForm
         fileMenu.DropDownItems.Add(
             exportPreviewItem);
 
+        fileMenu.DropDownItems.Add(
+            exportPreviewVideoItem);
+
         fileMenu.DropDownOpening +=
             (_, _) =>
             {
                 exportSceneItem.Enabled =
                     _sceneDocument.Models.Count >
                     0;
+
+                exportPreviewVideoItem.Enabled =
+                    _sceneDocument.Models.Count > 0 &&
+                    !_isModelLoadInProgress &&
+                    !_isVideoExportInProgress;
             };
 
         var viewMenu =

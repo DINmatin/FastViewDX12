@@ -86,6 +86,8 @@ public sealed partial class Dx12Renderer : IDisposable
 
     private SceneData? _scene;
 
+    public int MaximumDecodedTextureSize { get; set; }
+
     private IDXGIFactory4? _factory;
 
     private ID3D12Device? _device;
