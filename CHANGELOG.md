@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+No unreleased changes yet.
+
+## 1.4.0 - 2026-08-15
+
 ### Added
 
 * Added an `F3` viewport statistics overlay with FPS, VRAM usage/budget, polygon count, and vertex count.
