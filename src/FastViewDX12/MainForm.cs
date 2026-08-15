@@ -103,6 +103,8 @@ public sealed partial class MainForm : Form
         _renderPanel.Controls.Add(_progressOverlay);
         _renderPanel.Controls.Add(_dropOverlay);
 
+        InitializeStatisticsAndSpaceMouse();
+
         _menuStrip =
             CreateMainMenu();
 
@@ -237,6 +239,7 @@ public sealed partial class MainForm : Form
         while (AppStillIdle)
         {
             _renderer.Render();
+            CountRenderedFrame();
             UpdateMoveGizmoOverlay();
             PollViewerSettingsChanges();
         }
@@ -264,6 +267,7 @@ public sealed partial class MainForm : Form
             _videoExportCancellation?.Cancel();
             SaveViewerSettingsNow();
             DisposeMoveGizmoOverlay();
+            _spaceMouseInput.Dispose();
 
             Application.Idle -=
                 OnApplicationIdle;

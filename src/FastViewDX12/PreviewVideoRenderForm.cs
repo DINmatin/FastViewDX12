@@ -93,7 +93,8 @@ public sealed class PreviewVideoRenderForm : Form
 
                 CompactLargeObjectHeap();
 
-                _renderer.MaximumDecodedTextureSize = 2048;
+                // Offline preview output should preserve the source textures.
+                _renderer.MaximumDecodedTextureSize = 0;
                 using (performance.Measure("Uploading scene to GPU"))
                 {
                     _renderer.LoadScene(scene);

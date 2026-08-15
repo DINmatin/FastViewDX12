@@ -392,6 +392,74 @@ public sealed class CameraController
     }
 
     /// <summary>
+    /// Applies six-axis controller input as camera-relative pan, dolly, yaw,
+    /// and pitch movement. Values are expected in the signed HID report range.
+    /// </summary>
+    public void ApplySixAxisCameraInput(
+        Vector3 translation,
+        Vector3 rotation)
+    {
+        const float deadZone = 8.0f;
+
+        translation = ApplyDeadZone(translation, deadZone);
+        rotation = ApplyDeadZone(rotation, deadZone);
+
+        GetViewBasis(
+            out Vector3 forward,
+            out Vector3 right,
+            out Vector3 up);
+
+        float panScale = _distance * 0.00004f;
+
+        Vector3 eye =
+            GetEyePosition();
+
+        // 3Dconnexion reports X as lateral, Y as fore/aft, and Z as vertical.
+        // Translate the complete camera rig instead of changing orbit distance.
+        // This is unconstrained free-flight and can pass through scene geometry.
+        _target +=
+            (right * translation.X -
+             forward * translation.Y -
+             up * translation.Z * 2.5f) *
+            panScale;
+
+        _yaw -= rotation.Z * 0.0005f;
+        _pitch -= rotation.X * 0.0005f;
+        _pitch = Math.Clamp(
+            _pitch,
+            -MathF.PI * 0.5f,
+            MathF.PI * 0.5f);
+
+        // SpaceMouse camera mode rotates around the camera position rather than
+        // orbiting around the old target. Rebuild the target at the same distance.
+        _target = eye +
+            (_target - eye) +
+            GetForwardDirection() * _distance -
+            forward * _distance;
+
+        _orbitRawYaw = _yaw;
+        _orbitRawPitch = _pitch;
+    }
+
+    private static Vector3 ApplyDeadZone(Vector3 value, float deadZone)
+    {
+        return new Vector3(
+            MathF.Abs(value.X) >= deadZone ? value.X : 0.0f,
+            MathF.Abs(value.Y) >= deadZone ? value.Y : 0.0f,
+            MathF.Abs(value.Z) >= deadZone ? value.Z : 0.0f);
+    }
+
+    private Vector3 GetForwardDirection()
+    {
+        float cosPitch = MathF.Cos(_pitch);
+
+        return new Vector3(
+            -MathF.Sin(_yaw) * cosPitch,
+            -MathF.Sin(_pitch),
+            -MathF.Cos(_yaw) * cosPitch);
+    }
+
+    /// <summary>
     /// Builds the right-handed view-projection matrix used by the mesh shader.
     /// </summary>
     public Matrix4x4 GetViewProjectionMatrix()

@@ -2,7 +2,15 @@
 
 ## Unreleased
 
-No unreleased changes yet.
+### Added
+
+* Added an `F3` viewport statistics overlay with FPS, VRAM usage/budget, polygon count, and vertex count.
+* Added direct Windows Raw Input support for classic SpaceExplorer and current 3Dconnexion devices with unconstrained camera flight through scene geometry.
+
+### Changed
+
+* Background texture refinement now replaces the fast 512 px initial textures with their full source resolution, including 8K textures, without a 2K large-scene cap.
+* Preview-video rendering now uses full-resolution source textures.
 
 ## 1.3.0 - 2026-08-09
 

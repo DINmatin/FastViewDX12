@@ -293,6 +293,18 @@ public sealed partial class Dx12Renderer
             delta);
     }
 
+    /// <summary>Applies one SpaceMouse/SpaceExplorer motion report in camera mode.</summary>
+    public void ApplySixAxisCameraInput(
+        System.Numerics.Vector3 translation,
+        System.Numerics.Vector3 rotation)
+    {
+        _camera.ApplySixAxisCameraInput(
+            translation,
+            rotation);
+
+        MarkShadowMapDirty();
+    }
+
     /// <summary>
     /// Starts direct-light and environment rotation.
     /// </summary>

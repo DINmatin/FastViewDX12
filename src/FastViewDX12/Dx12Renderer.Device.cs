@@ -51,6 +51,9 @@ public sealed partial class Dx12Renderer
                 adapter,
                 FeatureLevel.Level_11_0);
 
+        _adapter =
+            adapter?.QueryInterfaceOrNull<IDXGIAdapter3>();
+
         adapter?.Dispose();
 
         _commandQueue =

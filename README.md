@@ -17,7 +17,9 @@ After installation, GLB, glTF, FBX, and OBJ files can be opened with FastView an
 ### Viewing and scene assembly
 
 - Open `.glb`, `.gltf`, `.fbx`, and `.obj` files from the command line, drag-and-drop, **Open with**, or the File menu.
-- Large textures appear quickly at 512 px and are refined in the background after the first frame.
+- Large textures appear quickly at 512 px and are refined to their full source resolution in the background after the first frame.
+- Optional viewport statistics show FPS, process VRAM usage/budget, polygons, and vertices (`F3`).
+- 3Dconnexion SpaceExplorer and SpaceMouse devices provide unconstrained six-axis camera flight through Windows Raw Input.
 - A large drop overlay reports `DROP HERE` or `WRONG FORMAT` before a file is released.
 - Add multiple models to one scene without replacing the models already loaded.
 - Select models directly in the viewport or from the scene sidebar.
@@ -76,6 +78,7 @@ After installation, GLB, glTF, FBX, and OBJ files can be opened with FastView an
 | `L` | Toggle Local/Global orientation |
 | `F` | Focus selection, or fit the complete scene |
 | `G` | Toggle ground grid |
+| `F3` | Toggle viewport statistics |
 | `Ctrl+Z` | Undo last transform |
 | `Ctrl+Shift+V` | Create 360-degree preview video |
 | `Shift` while rotating | Snap to 90-degree steps |

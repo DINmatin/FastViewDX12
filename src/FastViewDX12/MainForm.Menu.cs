@@ -134,6 +134,28 @@ public sealed partial class MainForm
             new ToolStripMenuItem(
                 "&View");
 
+        var statisticsItem =
+            new ToolStripMenuItem(
+                "Statistics")
+            {
+                CheckOnClick = true,
+                ShortcutKeys = Keys.F3
+            };
+
+        statisticsItem.CheckedChanged +=
+            (_, _) => ToggleStatistics();
+
+        var spaceMouseCameraItem =
+            new ToolStripMenuItem(
+                "SpaceExplorer camera mode")
+            {
+                CheckOnClick = true,
+                Checked = true
+            };
+
+        spaceMouseCameraItem.CheckedChanged +=
+            (_, _) => SetSpaceMouseCameraMode(spaceMouseCameraItem.Checked);
+
         var backgroundMenu =
             new ToolStripMenuItem(
                 "Background");
@@ -1147,6 +1169,15 @@ public sealed partial class MainForm
 
         viewMenu.DropDownItems.Add(
             backgroundMenu);
+
+        viewMenu.DropDownItems.Add(
+            statisticsItem);
+
+        viewMenu.DropDownItems.Add(
+            spaceMouseCameraItem);
+
+        viewMenu.DropDownItems.Add(
+            new ToolStripSeparator());
 
         viewMenu.DropDownItems.Add(
             postProcessingMenu);

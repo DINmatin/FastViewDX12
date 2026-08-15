@@ -90,6 +90,8 @@ public sealed partial class Dx12Renderer : IDisposable
 
     private IDXGIFactory4? _factory;
 
+    private IDXGIAdapter3? _adapter;
+
     private ID3D12Device? _device;
 
     private ID3D12CommandQueue? _commandQueue;
@@ -294,6 +296,7 @@ public sealed partial class Dx12Renderer : IDisposable
         _swapChain?.Dispose();
         _commandQueue?.Dispose();
         _device?.Dispose();
+        _adapter?.Dispose();
         _factory?.Dispose();
 
         _fenceEvent.Dispose();
@@ -347,6 +350,9 @@ public sealed partial class Dx12Renderer : IDisposable
             null;
 
         _device =
+            null;
+
+        _adapter =
             null;
 
         _factory =

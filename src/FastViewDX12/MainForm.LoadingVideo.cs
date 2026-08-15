@@ -7,9 +7,6 @@ namespace FastViewDX12;
 public sealed partial class MainForm
 {
     private const int InitialTextureMaximumDimension = 512;
-    private const int LargeSceneRefinementMaximumDimension = 2048;
-    private const long FullResolutionTextureBudgetBytes =
-        512L * 1024L * 1024L;
 
     private readonly record struct TextureRefinementTarget(
         MaterialData Material,
@@ -38,16 +35,6 @@ public sealed partial class MainForm
                 () => BuildTextureRefinementTargets(token),
                 token);
 
-            long estimatedBytes = targets.Sum(
-                target =>
-                    (long)target.Dimensions.Width *
-                    target.Dimensions.Height * 4L);
-
-            int? maximumDimension =
-                estimatedBytes <= FullResolutionTextureBudgetBytes
-                    ? null
-                    : LargeSceneRefinementMaximumDimension;
-
             for (int index = 0; index < targets.Count; index++)
             {
                 token.ThrowIfCancellationRequested();
@@ -62,7 +49,7 @@ public sealed partial class MainForm
                 DecodedTexture decoded = await Task.Run(
                     () => TextureDecoder.Decode(
                         target.EncodedBytes,
-                        maximumDimension),
+                        maximumDimension: null),
                     token);
 
                 token.ThrowIfCancellationRequested();

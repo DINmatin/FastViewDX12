@@ -39,6 +39,13 @@ After installing:
 3. Confirm transparent thumbnails for all four formats.
 4. Confirm a glTF with adjacent `.bin` and texture files renders correctly.
 5. Rename or temporarily remove a referenced texture and confirm the provider fails cleanly rather than hanging Explorer.
+
+## Viewport statistics and six-axis input
+
+1. Press `F3` and confirm FPS, VRAM, polygons, and vertices update without flicker.
+2. Load a model containing 8K textures and confirm the first frame uses the fast 512 px stage before the window-title refinement counter completes at full resolution.
+3. With a SpaceExplorer or SpaceMouse connected, enable **View > SpaceExplorer camera mode** and confirm pan, dolly, yaw, and pitch respond while FastView is focused.
+4. Disable the camera-mode menu item and confirm six-axis motion no longer changes the view.
 6. Uninstall FastView and confirm all thumbnail registrations are removed.
 
 Diagnostic files, when needed:
