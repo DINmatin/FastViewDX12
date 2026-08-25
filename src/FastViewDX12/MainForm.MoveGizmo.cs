@@ -64,7 +64,7 @@ public sealed partial class MainForm
 
     private TransformGizmoAxis _draggedMoveGizmoAxis;
 
-    private SceneModel? _moveGizmoDragModel;
+    private ISceneTransformTarget? _moveGizmoDragModel;
 
     private Point _moveGizmoDragStartMouse;
 
@@ -845,13 +845,16 @@ public sealed partial class MainForm
         anchor =
             default;
 
-        SceneModel? model =
-            _sceneDocument.SelectedModel;
+        ISceneTransformTarget? model =
+            _sceneDocument.SelectedTransformTarget;
+
+        Vector3 targetOrigin =
+            GetTransformTargetWorldOrigin(model);
 
         if (model ==
                 null ||
             !_renderer.TryProjectWorldToScreen(
-                model.Position,
+                targetOrigin,
                 out PointF origin))
         {
             return false;
@@ -870,7 +873,7 @@ public sealed partial class MainForm
             TransformGizmoOrientation.Local)
         {
             Matrix4x4 linearTransform =
-                model.LinearTransform;
+                GetTransformTargetWorldLinearTransform(model);
 
             worldAxisX =
                 NormalizeGizmoAxis(
@@ -896,19 +899,19 @@ public sealed partial class MainForm
 
         Vector2 projectedX =
             TryProjectTransformGizmoAxis(
-                model.Position,
+                targetOrigin,
                 origin,
                 worldAxisX);
 
         Vector2 projectedY =
             TryProjectTransformGizmoAxis(
-                model.Position,
+                targetOrigin,
                 origin,
                 worldAxisY);
 
         Vector2 projectedZ =
             TryProjectTransformGizmoAxis(
-                model.Position,
+                targetOrigin,
                 origin,
                 worldAxisZ);
 
@@ -1310,8 +1313,8 @@ public sealed partial class MainForm
     private bool TryBeginMoveGizmoDrag(
         Point mousePosition)
     {
-        SceneModel? model =
-            _sceneDocument.SelectedModel;
+        ISceneTransformTarget? model =
+            _sceneDocument.SelectedTransformTarget;
 
         if (model ==
                 null ||
@@ -1454,11 +1457,16 @@ public sealed partial class MainForm
             return false;
         }
 
-        Vector3 newPosition =
-            _moveGizmoDragStartPosition +
+        Vector3 worldDelta =
             _moveGizmoDragWorldAxis *
             pixelDistance *
             _moveGizmoDragWorldUnitsPerPixel;
+
+        Vector3 newPosition =
+            _moveGizmoDragStartPosition +
+            ConvertWorldDeltaToTransformTargetSpace(
+                _moveGizmoDragModel,
+                worldDelta);
 
         if (Vector3.DistanceSquared(
                 _moveGizmoDragModel.Position,
@@ -1541,11 +1549,13 @@ public sealed partial class MainForm
         // a global delta acts after it.
         Matrix4x4 combinedLinearTransform =
             _draggedTransformGizmoOrientation ==
-                TransformGizmoOrientation.Local
+            TransformGizmoOrientation.Local
                 ? axisDelta *
                   _moveGizmoDragStartLinearTransform
-                : _moveGizmoDragStartLinearTransform *
-                  axisDelta;
+                : ApplyWorldLinearDeltaToTransformTarget(
+                    _moveGizmoDragModel,
+                    _moveGizmoDragStartLinearTransform,
+                    axisDelta);
 
         if (LinearTransformsNearlyEqual(
                 _moveGizmoDragModel.LinearTransform,
@@ -1615,8 +1625,10 @@ public sealed partial class MainForm
                     TransformGizmoOrientation.Local
                     ? scaleDelta *
                       _moveGizmoDragStartLinearTransform
-                    : _moveGizmoDragStartLinearTransform *
-                      scaleDelta;
+                    : ApplyWorldLinearDeltaToTransformTarget(
+                        _moveGizmoDragModel,
+                        _moveGizmoDragStartLinearTransform,
+                        scaleDelta);
         }
 
         if (LinearTransformsNearlyEqual(
@@ -1649,6 +1661,65 @@ public sealed partial class MainForm
             MathF.Abs(first.M31 - second.M31) <= tolerance &&
             MathF.Abs(first.M32 - second.M32) <= tolerance &&
             MathF.Abs(first.M33 - second.M33) <= tolerance;
+    }
+
+    private static Vector3 GetTransformTargetWorldOrigin(
+        ISceneTransformTarget? target)
+    {
+        if (target is SceneMeshPart part)
+        {
+            return Vector3.Transform(
+                part.Pivot + part.Position,
+                part.Parent.CreateTransform());
+        }
+
+        return target?.Position ??
+            Vector3.Zero;
+    }
+
+    private static Matrix4x4 GetTransformTargetWorldLinearTransform(
+        ISceneTransformTarget target)
+    {
+        return target is SceneMeshPart part
+            ? part.LinearTransform * part.Parent.LinearTransform
+            : target.LinearTransform;
+    }
+
+    private static Vector3 ConvertWorldDeltaToTransformTargetSpace(
+        ISceneTransformTarget target,
+        Vector3 worldDelta)
+    {
+        if (target is not SceneMeshPart part ||
+            !Matrix4x4.Invert(
+                part.Parent.LinearTransform,
+                out Matrix4x4 inverseParent))
+        {
+            return worldDelta;
+        }
+
+        return Vector3.TransformNormal(
+            worldDelta,
+            inverseParent);
+    }
+
+    private static Matrix4x4 ApplyWorldLinearDeltaToTransformTarget(
+        ISceneTransformTarget target,
+        Matrix4x4 startLinearTransform,
+        Matrix4x4 worldDelta)
+    {
+        if (target is not SceneMeshPart part ||
+            !Matrix4x4.Invert(
+                part.Parent.LinearTransform,
+                out Matrix4x4 inverseParent))
+        {
+            return startLinearTransform * worldDelta;
+        }
+
+        return
+            startLinearTransform *
+            part.Parent.LinearTransform *
+            worldDelta *
+            inverseParent;
     }
 
     private bool EndMoveGizmoDrag()

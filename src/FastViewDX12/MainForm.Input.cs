@@ -9,6 +9,8 @@ namespace FastViewDX12;
 // Mouse, keyboard, and drag-and-drop routing for camera, light, selection, and file interaction.
 public sealed partial class MainForm
 {
+    private const int DragDropControlKeyState = 8;
+
     private const int ViewportClickDragThresholdPixels =
         4;
 
@@ -288,19 +290,30 @@ public sealed partial class MainForm
             {
                 fileName = Path.GetFileName(files[0]);
                 bool isValid = IsSupportedModelPath(files[0]);
-                _dropOverlay.ShowFeedback(isValid, fileName);
+                bool addToScene =
+                    (e.KeyState & DragDropControlKeyState) != 0;
+
+                _dropOverlay.ShowFeedback(
+                    isValid,
+                    fileName,
+                    addToScene);
 
                 if (isValid)
                 {
                     e.Effect =
-                        DragDropEffects.Copy;
+                        addToScene
+                            ? DragDropEffects.Copy
+                            : DragDropEffects.Link;
 
                     return;
                 }
             }
         }
 
-        _dropOverlay.ShowFeedback(false, fileName);
+        _dropOverlay.ShowFeedback(
+            false,
+            fileName,
+            addToScene: false);
         e.Effect =
             DragDropEffects.None;
     }
@@ -313,7 +326,7 @@ public sealed partial class MainForm
     }
 
     /// <summary>
-    /// Loads the first supported GLB or glTF file from a drop operation.
+    /// Opens a dropped model, or adds it to the current scene while Ctrl is held.
     /// </summary>
     private void RenderPanel_DragDrop(
         object? sender,
@@ -333,9 +346,20 @@ public sealed partial class MainForm
                 return;
             }
 
-            LoadModelFromPath(
-                files[0],
-                true);
+            bool addToScene =
+                (e.KeyState & DragDropControlKeyState) != 0;
+
+            if (addToScene)
+            {
+                AddModelFromPath(
+                    files[0]);
+            }
+            else
+            {
+                ReplaceSceneFromPath(
+                    files[0],
+                    rememberAsLast: true);
+            }
         }
         catch (Exception ex)
         {

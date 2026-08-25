@@ -90,6 +90,7 @@ public sealed partial class MainForm
         // Shader constants read MaterialData every frame, so no geometry,
         // texture, descriptor-heap, or scene rebuild is required here.
         _renderer.Render();
+        UpdateInspectorControlState();
     }
 
     private void AppendGroundGrid(

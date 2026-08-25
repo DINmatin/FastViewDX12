@@ -19,6 +19,14 @@ public sealed class SceneDocument
     /// <summary>Gets the model selected by the scene panel, if any.</summary>
     public SceneModel? SelectedModel { get; private set; }
 
+    /// <summary>Gets the selected mesh part, or null when the file root is selected.</summary>
+    public SceneMeshPart? SelectedPart { get; private set; }
+
+    /// <summary>Gets the file root or mesh part currently edited by the transform tools.</summary>
+    public ISceneTransformTarget? SelectedTransformTarget =>
+        (ISceneTransformTarget?)SelectedPart ??
+        SelectedModel;
+
     /// <summary>Removes all existing models and inserts one new root model.</summary>
     public SceneModel ReplaceWith(
         string sourcePath,
@@ -26,6 +34,9 @@ public sealed class SceneDocument
     {
         _models.Clear();
         SelectedModel =
+            null;
+
+        SelectedPart =
             null;
 
         return Add(sourcePath, scene);
@@ -48,6 +59,9 @@ public sealed class SceneDocument
         SelectedModel =
             model;
 
+        SelectedPart =
+            null;
+
         return model;
     }
 
@@ -60,6 +74,26 @@ public sealed class SceneDocument
             _models.Contains(model)
                 ? model
                 : null;
+
+        SelectedPart =
+            null;
+    }
+
+    /// <summary>Selects one mesh part belonging to a model in this document.</summary>
+    public void SelectPart(
+        SceneModel model,
+        SceneMeshPart part)
+    {
+        if (!_models.Contains(model) ||
+            !model.Parts.Contains(part))
+        {
+            SelectedModel = null;
+            SelectedPart = null;
+            return;
+        }
+
+        SelectedModel = model;
+        SelectedPart = part;
     }
 
     /// <summary>Removes one model and selects the nearest remaining entry.</summary>
@@ -82,6 +116,9 @@ public sealed class SceneDocument
         {
             SelectedModel =
                 null;
+
+            SelectedPart =
+                null;
         }
         else
         {
@@ -92,6 +129,9 @@ public sealed class SceneDocument
 
             SelectedModel =
                 _models[nextIndex];
+
+            SelectedPart =
+                null;
         }
 
         return true;
@@ -127,31 +167,35 @@ public sealed class SceneDocument
         destination.Materials.AddRange(
             model.SourceScene.Materials);
 
-        Matrix4x4 transform =
-            model.CreateTransform();
-
-        Matrix4x4 normalTransform =
-            transform;
-
-        if (Matrix4x4.Invert(
-            transform,
-            out Matrix4x4 inverseTransform))
+        foreach (SceneMeshPart part in model.Parts)
         {
-            normalTransform =
-                Matrix4x4.Transpose(
-                    inverseTransform);
-        }
+            MeshData sourceMesh =
+                model.SourceScene.Meshes[part.SourceMeshIndex];
 
-        bool mirrored =
-            transform.GetDeterminant() < 0.0f;
+            Matrix4x4 transform =
+                part.CreateTransform() *
+                model.CreateTransform();
 
-        foreach (MeshData sourceMesh in
-                 model.SourceScene.Meshes)
-        {
+            Matrix4x4 normalTransform =
+                transform;
+
+            if (Matrix4x4.Invert(
+                transform,
+                out Matrix4x4 inverseTransform))
+            {
+                normalTransform =
+                    Matrix4x4.Transpose(
+                        inverseTransform);
+            }
+
+            bool mirrored =
+                transform.GetDeterminant() < 0.0f;
+
             destination.Meshes.Add(
                 CloneMesh(
                     sourceMesh,
                     model,
+                    part,
                     materialOffset,
                     transform,
                     normalTransform,
@@ -162,6 +206,7 @@ public sealed class SceneDocument
     private static MeshData CloneMesh(
         MeshData source,
         SceneModel model,
+        SceneMeshPart part,
         int materialOffset,
         Matrix4x4 transform,
         Matrix4x4 normalTransform,
@@ -250,7 +295,7 @@ public sealed class SceneDocument
         return new MeshData
         {
             Name =
-                $"{model.Name}/{source.Name}",
+                $"{model.Name}/{part.Name}",
 
             MaterialIndex =
                 source.MaterialIndex +
@@ -292,7 +337,7 @@ public sealed class SceneDocument
 /// <summary>
 /// One independently transformable model inside a <see cref="SceneDocument"/>.
 /// </summary>
-public sealed class SceneModel
+public sealed class SceneModel : ISceneTransformTarget
 {
     private Vector3 _rotationDegrees;
 
@@ -323,6 +368,17 @@ public sealed class SceneModel
 
         SourceScene =
             sourceScene;
+
+        for (int meshIndex = 0;
+             meshIndex < sourceScene.Meshes.Count;
+             meshIndex++)
+        {
+            Parts.Add(
+                new SceneMeshPart(
+                    this,
+                    meshIndex,
+                    sourceScene.Meshes[meshIndex]));
+        }
     }
 
     /// <summary>Gets the stable model identifier used by later selection tools.</summary>
@@ -336,6 +392,10 @@ public sealed class SceneModel
 
     /// <summary>Gets the immutable scene loaded from the source file.</summary>
     public SceneData SourceScene { get; }
+
+    /// <summary>Gets independently transformable renderer meshes in source order.</summary>
+    public List<SceneMeshPart> Parts { get; } =
+        new();
 
     /// <summary>Gets or sets the model translation in scene units.</summary>
     public Vector3 Position { get; set; }
@@ -814,5 +874,111 @@ public sealed class SceneModel
         }
 
         return degrees;
+    }
+}
+
+/// <summary>Common transform surface used by file roots and their editable mesh parts.</summary>
+public interface ISceneTransformTarget
+{
+    Guid Id { get; }
+    string Name { get; set; }
+    Vector3 Position { get; set; }
+    Vector3 RotationDegrees { get; set; }
+    Vector3 Scale { get; set; }
+    Matrix4x4 LinearTransform { get; }
+    void SetLinearTransform(Matrix4x4 linearTransform);
+}
+
+/// <summary>
+/// One independently editable primitive inside a loaded file. Source geometry
+/// and materials stay shared with the parent model; only transform state is new.
+/// </summary>
+public sealed class SceneMeshPart : ISceneTransformTarget
+{
+    private readonly SceneModel _transformState;
+
+    public SceneMeshPart(
+        SceneModel parent,
+        int sourceMeshIndex,
+        MeshData sourceMesh)
+    {
+        Parent = parent;
+        SourceMeshIndex = sourceMeshIndex;
+        _transformState =
+            new SceneModel(
+                parent.SourcePath,
+                new SceneData())
+            {
+                Name = string.IsNullOrWhiteSpace(sourceMesh.Name)
+                    ? $"Mesh {sourceMeshIndex + 1}"
+                    : sourceMesh.Name
+            };
+
+        Pivot = CalculateBoundsCenter(sourceMesh.Positions);
+    }
+
+    public SceneModel Parent { get; }
+    public int SourceMeshIndex { get; }
+    public Vector3 Pivot { get; }
+    public Guid Id => _transformState.Id;
+
+    public string Name
+    {
+        get => _transformState.Name;
+        set => _transformState.Name = value;
+    }
+
+    public Vector3 Position
+    {
+        get => _transformState.Position;
+        set => _transformState.Position = value;
+    }
+
+    public Vector3 RotationDegrees
+    {
+        get => _transformState.RotationDegrees;
+        set => _transformState.RotationDegrees = value;
+    }
+
+    public Vector3 Scale
+    {
+        get => _transformState.Scale;
+        set => _transformState.Scale = value;
+    }
+
+    public Matrix4x4 LinearTransform =>
+        _transformState.LinearTransform;
+
+    public void SetLinearTransform(Matrix4x4 linearTransform)
+    {
+        _transformState.SetLinearTransform(linearTransform);
+    }
+
+    /// <summary>Builds a pivot-centered transform in the parent model's space.</summary>
+    public Matrix4x4 CreateTransform()
+    {
+        return
+            Matrix4x4.CreateTranslation(-Pivot) *
+            LinearTransform *
+            Matrix4x4.CreateTranslation(Pivot + Position);
+    }
+
+    private static Vector3 CalculateBoundsCenter(Vector3[] positions)
+    {
+        if (positions.Length == 0)
+        {
+            return Vector3.Zero;
+        }
+
+        Vector3 minimum = new(float.MaxValue);
+        Vector3 maximum = new(float.MinValue);
+
+        foreach (Vector3 position in positions)
+        {
+            minimum = Vector3.Min(minimum, position);
+            maximum = Vector3.Max(maximum, position);
+        }
+
+        return (minimum + maximum) * 0.5f;
     }
 }

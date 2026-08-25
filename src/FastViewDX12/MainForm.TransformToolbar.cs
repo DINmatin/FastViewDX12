@@ -467,6 +467,8 @@ public sealed partial class MainForm
 
     private void UpdateTransformToolbarState()
     {
+        UpdateInspectorControlState();
+
         if (_moveTransformButton ==
             null)
         {

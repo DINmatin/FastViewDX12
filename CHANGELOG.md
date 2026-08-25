@@ -4,6 +4,23 @@
 
 No unreleased changes yet.
 
+## 1.5.0 - 2026-08-25
+
+### Added
+
+* Added `Alt+Enter` borderless fullscreen mode.
+* Added editor-style transform number fields with horizontal scrubbing and double-click keyboard entry.
+* Added collapsed Inspector controls for environment and direct-light intensity, EXR opacity, bloom tuning, and shadow tuning.
+* Added automatic unsaved-session recovery for all loaded models, their scene order, selection, and exact transforms.
+* Added hierarchical file and mesh-part selection with independent part transforms, pivot-centered rotation and scaling, viewport picking, undo, focus, and session recovery.
+* Added a Yes/No/Cancel close prompt for unexported transform changes, while retaining changes in automatic recovery when export is declined.
+
+### Changed
+
+* Replaced the floating icon toolbar with a unified Inspector for transform, view, camera, and rendering controls.
+* Drag-and-drop now opens and replaces the scene by default; holding `Ctrl` adds the dropped model to the current scene and changes both the cursor and overlay feedback.
+* Exported scene GLBs retain separate editable meshes when loaded back into FastView instead of becoming one indivisible transform target.
+
 ## 1.4.0 - 2026-08-15
 
 ### Added

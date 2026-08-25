@@ -136,12 +136,12 @@ public sealed partial class MainForm : Form
             _menuStrip;
 
         _renderPanel.HandleCreated +=
-            (_, _) =>
+            async (_, _) =>
             {
                 _renderer.Initialize();
                 TryLoadConfiguredEnvironmentMap();
                 ApplyViewerSettingsToRenderer();
-                TryLoadStartupModel();
+                await RestoreStartupSceneAsync();
                 ApplySavedCameraView();
                 BeginViewerSettingsTracking();
             };
@@ -266,6 +266,7 @@ public sealed partial class MainForm : Form
             _loadCancellation?.Cancel();
             _videoExportCancellation?.Cancel();
             SaveViewerSettingsNow();
+            SaveSceneSessionNow();
             DisposeMoveGizmoOverlay();
             _spaceMouseInput.Dispose();
 

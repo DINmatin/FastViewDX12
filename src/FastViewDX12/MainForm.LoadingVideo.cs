@@ -297,15 +297,40 @@ public sealed partial class MainForm
     {
         CancelTextureRefinement();
 
-        if (!_isModelLoadInProgress && !_isVideoExportInProgress)
+        if (_isModelLoadInProgress || _isVideoExportInProgress)
         {
+            e.Cancel = true;
+            _closeWhenIdle = true;
+            _loadCancellation?.Cancel();
+            _videoExportCancellation?.Cancel();
             return;
         }
 
-        e.Cancel = true;
-        _closeWhenIdle = true;
-        _loadCancellation?.Cancel();
-        _videoExportCancellation?.Cancel();
+        if (!_sceneTransformsDirty)
+        {
+            _closeWhenIdle = false;
+            return;
+        }
+
+        _closeWhenIdle = false;
+
+        DialogResult result =
+            MessageBox.Show(
+                this,
+                "Model transformations have changed.\n\n" +
+                "Export the current scene as a GLB before closing?\n\n" +
+                "Choosing No keeps the changes only in FastView's automatic recovery session.",
+                "Save transformed scene?",
+                MessageBoxButtons.YesNoCancel,
+                MessageBoxIcon.Question,
+                MessageBoxDefaultButton.Button1);
+
+        if (result == DialogResult.Cancel ||
+            result == DialogResult.Yes &&
+            !ExportSceneAsGlb(showSuccessMessage: false))
+        {
+            e.Cancel = true;
+        }
     }
 
     private void CloseWhenIdleIfRequested()

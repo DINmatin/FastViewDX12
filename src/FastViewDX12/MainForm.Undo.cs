@@ -16,9 +16,11 @@ public sealed partial class MainForm
 
     private TransformUndoEntry? _pendingTransformUndo;
 
+    private bool _sceneTransformsDirty;
+
     private sealed class TransformUndoEntry
     {
-        public required SceneModel Model { get; init; }
+        public required ISceneTransformTarget Target { get; init; }
 
         public required string Description { get; init; }
 
@@ -32,13 +34,13 @@ public sealed partial class MainForm
     /// same model without creating additional history entries.
     /// </summary>
     private void BeginTransformUndo(
-        SceneModel model,
+        ISceneTransformTarget model,
         string description)
     {
         if (_pendingTransformUndo != null)
         {
             if (ReferenceEquals(
-                    _pendingTransformUndo.Model,
+                    _pendingTransformUndo.Target,
                     model) &&
                 string.Equals(
                     _pendingTransformUndo.Description,
@@ -54,7 +56,7 @@ public sealed partial class MainForm
         _pendingTransformUndo =
             new TransformUndoEntry
             {
-                Model = model,
+                Target = model,
                 Description = description,
                 Position = model.Position,
                 LinearTransform = model.LinearTransform
@@ -73,10 +75,10 @@ public sealed partial class MainForm
             null;
 
         if (entry == null ||
-            !IsSceneModelStillPresent(
-                entry.Model) ||
+            !IsTransformTargetStillPresent(
+                entry.Target) ||
             TransformStateMatches(
-                entry.Model,
+                entry.Target,
                 entry.Position,
                 entry.LinearTransform))
         {
@@ -92,6 +94,11 @@ public sealed partial class MainForm
 
         _transformUndoHistory.Add(
             entry);
+
+        _sceneTransformsDirty =
+            true;
+
+        SaveSceneSessionNow();
     }
 
     /// <summary>
@@ -114,20 +121,20 @@ public sealed partial class MainForm
             _transformUndoHistory.RemoveAt(
                 lastIndex);
 
-            if (!IsSceneModelStillPresent(
-                    entry.Model))
+            if (!IsTransformTargetStillPresent(
+                    entry.Target))
             {
                 continue;
             }
 
-            entry.Model.Position =
+            entry.Target.Position =
                 entry.Position;
 
-            entry.Model.SetLinearTransform(
+            entry.Target.SetLinearTransform(
                 entry.LinearTransform);
 
-            _sceneDocument.Select(
-                entry.Model);
+            SelectTransformTarget(
+                entry.Target);
 
             ApplySceneModelTransform();
             RefreshSceneSidebar();
@@ -136,6 +143,8 @@ public sealed partial class MainForm
 
             _renderer.Render();
             _moveGizmoOverlayForm?.Update();
+            _sceneTransformsDirty = true;
+            SaveSceneSessionNow();
 
             return;
         }
@@ -154,8 +163,10 @@ public sealed partial class MainForm
     {
         if (_pendingTransformUndo != null &&
             ReferenceEquals(
-                _pendingTransformUndo.Model,
-                model))
+                _pendingTransformUndo.Target,
+                model) ||
+            _pendingTransformUndo?.Target is SceneMeshPart pendingPart &&
+            ReferenceEquals(pendingPart.Parent, model))
         {
             _pendingTransformUndo =
                 null;
@@ -163,20 +174,21 @@ public sealed partial class MainForm
 
         _transformUndoHistory.RemoveAll(
             entry =>
-                ReferenceEquals(
-                    entry.Model,
-                    model));
+                ReferenceEquals(entry.Target, model) ||
+                entry.Target is SceneMeshPart part &&
+                ReferenceEquals(part.Parent, model));
     }
 
-    private bool IsSceneModelStillPresent(
-        SceneModel model)
+    private bool IsTransformTargetStillPresent(
+        ISceneTransformTarget target)
     {
         foreach (SceneModel currentModel in
                  _sceneDocument.Models)
         {
-            if (ReferenceEquals(
-                    currentModel,
-                    model))
+            if (ReferenceEquals(currentModel, target) ||
+                target is SceneMeshPart part &&
+                ReferenceEquals(part.Parent, currentModel) &&
+                currentModel.Parts.Contains(part))
             {
                 return true;
             }
@@ -186,7 +198,7 @@ public sealed partial class MainForm
     }
 
     private static bool TransformStateMatches(
-        SceneModel model,
+        ISceneTransformTarget model,
         Vector3 position,
         Matrix4x4 linearTransform)
     {
@@ -198,5 +210,17 @@ public sealed partial class MainForm
             LinearTransformsNearlyEqual(
                 model.LinearTransform,
                 linearTransform);
+    }
+
+    private void SelectTransformTarget(ISceneTransformTarget target)
+    {
+        if (target is SceneMeshPart part)
+        {
+            _sceneDocument.SelectPart(part.Parent, part);
+        }
+        else if (target is SceneModel model)
+        {
+            _sceneDocument.Select(model);
+        }
     }
 }

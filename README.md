@@ -6,9 +6,9 @@ FastView is a lightweight Windows viewer and scene-assembly tool for **GLB**, **
 
 ## Download
 
-**[Download the latest FastView installer](https://github.com/DINmatin/FastViewDX12/releases/latest/download/FastView_Setup_1.4.0.exe)**
+**[Download the latest FastView installer](https://github.com/DINmatin/FastViewDX12/releases/latest/download/FastView_Setup_1.5.0.exe)**
 
-Download the installer, start `FastView_Setup_1.4.0.exe`, and follow the setup instructions.
+Download the installer, start `FastView_Setup_1.5.0.exe`, and follow the setup instructions.
 
 After installation, GLB, glTF, FBX, and OBJ files can be opened with FastView and displayed as thumbnails in Windows Explorer.
 
@@ -20,8 +20,12 @@ After installation, GLB, glTF, FBX, and OBJ files can be opened with FastView an
 - Large textures appear quickly at 512 px and are refined to their full source resolution in the background after the first frame.
 - Optional viewport statistics show FPS, process VRAM usage/budget, polygons, and vertices (`F3`).
 - 3Dconnexion SpaceExplorer and SpaceMouse devices provide unconstrained six-axis camera flight through Windows Raw Input.
-- A large drop overlay reports `DROP HERE` or `WRONG FORMAT` before a file is released.
+- A large drop overlay distinguishes `OPEN MODEL` from `ADD TO SCENE`: dropping normally replaces the scene, while holding `Ctrl` adds the model without replacing it.
 - Add multiple models to one scene without replacing the models already loaded.
+- The unsaved scene session automatically restores all loaded model paths, model order, selection, and exact transforms on the next start.
+- Every loaded file appears as an editable root with individually selectable mesh parts; viewport clicks select a part while the Inspector file header still transforms the complete file.
+- Scene GLB exports preserve separate meshes, so their parts remain independently editable when the exported file is loaded again.
+- Closing with unexported transform changes offers to export the scene as GLB; choosing No keeps the editable state in automatic session recovery.
 - Select models directly in the viewport or from the scene sidebar.
 - Focus the selected model with `F`; when nothing is selected, `F` fits the complete scene.
 - Perspective camera presets for front, right, left, top, bottom, and back views.
@@ -39,7 +43,9 @@ After installation, GLB, glTF, FBX, and OBJ files can be opened with FastView an
 - Per-row reset buttons for Position, Rotation, and Scale, plus a full Transform reset.
 - Hold `Shift` while rotating the camera or a model to snap to 90-degree steps.
 - `Ctrl+Z` transform undo with one undo step per completed gizmo drag.
-- Collapsible viewport toolbar with transform, orientation, view, shadow, and bloom controls.
+- A unified Inspector provides transform, orientation, camera, view, lighting, shadow, bloom, and detailed rendering controls.
+- Inspector number fields scrub horizontally and switch to precise keyboard entry on double-click.
+- `Alt+Enter` toggles borderless fullscreen mode.
 
 ### Rendering
 
@@ -79,6 +85,7 @@ After installation, GLB, glTF, FBX, and OBJ files can be opened with FastView an
 | `F` | Focus selection, or fit the complete scene |
 | `G` | Toggle ground grid |
 | `F3` | Toggle viewport statistics |
+| `Alt+Enter` | Toggle borderless fullscreen |
 | `Ctrl+Z` | Undo last transform |
 | `Ctrl+Shift+V` | Create 360-degree preview video |
 | `Shift` while rotating | Snap to 90-degree steps |
@@ -110,7 +117,7 @@ dotnet build .\FastView.slnx -c Release
 Create a self-contained release payload and ZIP:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\build\BuildRelease.ps1 -Version 1.4.0
+powershell -ExecutionPolicy Bypass -File .\build\BuildRelease.ps1 -Version 1.5.0
 ```
 
 Create the Windows installer:

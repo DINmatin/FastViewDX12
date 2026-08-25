@@ -36,13 +36,25 @@ public sealed class DropFeedbackOverlay : UserControl
         Controls.Add(_fileLabel);
     }
 
-    public void ShowFeedback(bool isValid, string? fileName)
+    public void ShowFeedback(
+        bool isValid,
+        string? fileName,
+        bool addToScene)
     {
-        _messageLabel.Text = isValid ? "DROP HERE" : "WRONG FORMAT";
+        _messageLabel.Text = isValid
+            ? addToScene
+                ? "ADD TO SCENE"
+                : "OPEN MODEL"
+            : "WRONG FORMAT";
         _messageLabel.ForeColor = isValid
             ? Color.FromArgb(105, 230, 145)
             : Color.FromArgb(255, 105, 105);
-        _fileLabel.Text = fileName ?? string.Empty;
+        _fileLabel.Text = isValid
+            ? $"{fileName}\n" +
+              (addToScene
+                  ? "Release Ctrl to replace the current scene"
+                  : "Hold Ctrl to add without replacing")
+            : fileName ?? string.Empty;
         Visible = true;
         BringToFront();
     }
@@ -52,4 +64,3 @@ public sealed class DropFeedbackOverlay : UserControl
         Visible = false;
     }
 }
-

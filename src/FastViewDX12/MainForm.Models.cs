@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Windows.Forms;
@@ -9,18 +8,12 @@ namespace FastViewDX12;
 // Model-path validation, scene replacement, additional loading, and last-file persistence.
 public sealed partial class MainForm
 {
-    // BuildRenderScene flattens the models in document order. Remembering
-    // each source mesh count lets viewport picking map a rendered triangle
-    // back to the SceneModel that owns it.
-    private readonly Dictionary<SceneModel, int> _sourceMeshCountByModel =
-        new();
-
     /// <summary>
     /// Validates and loads a GLB or glTF file as the only model in the scene.
     /// </summary>
     /// <param name="path">Model path selected by the user, drag-and-drop, or startup recovery.</param>
     /// <param name="rememberAsLast">Whether the path becomes the next startup model.</param>
-    private async void LoadModelFromPath(
+    private async void ReplaceSceneFromPath(
         string path,
         bool rememberAsLast = true)
     {
@@ -87,13 +80,13 @@ public sealed partial class MainForm
         }
         else
         {
-            LoadModelFromPath(
+            ReplaceSceneFromPath(
                 dialog.FileName,
                 true);
         }
     }
 
-    private async Task LoadModelFromPathAsync(
+    private async Task<SceneModel?> LoadModelFromPathAsync(
         string path,
         bool addToScene,
         bool rememberAsLast)
@@ -102,7 +95,7 @@ public sealed partial class MainForm
             _isModelLoadInProgress ||
             _isVideoExportInProgress)
         {
-            return;
+            return null;
         }
 
         CancelTextureRefinement();
@@ -113,6 +106,7 @@ public sealed partial class MainForm
         CancellationToken cancellationToken = _loadCancellation.Token;
         var performance = new ModelLoadPerformanceReport(path);
         SceneData? loadedScene = null;
+        SceneModel? loadedModel = null;
         bool loadCompleted = false;
 
         _menuStrip.Enabled = false;
@@ -145,22 +139,17 @@ public sealed partial class MainForm
 
             if (addToScene)
             {
-                _sceneDocument.Add(
+                loadedModel = _sceneDocument.Add(
                     path,
                     loadedScene);
             }
             else
             {
                 ClearTransformUndoHistory();
-                _sourceMeshCountByModel.Clear();
-
-                _sceneDocument.ReplaceWith(
+                loadedModel = _sceneDocument.ReplaceWith(
                     path,
                     loadedScene);
             }
-
-            RememberLoadedModelMeshCount(
-                loadedScene);
 
             RebuildRenderedScene();
             RefreshSceneSidebar();
@@ -178,6 +167,11 @@ public sealed partial class MainForm
             }
 
             loadCompleted = true;
+
+            if (!_restoringSceneSession)
+            {
+                SaveSceneSessionNow();
+            }
         }
         catch (OperationCanceledException)
         {
@@ -220,6 +214,10 @@ public sealed partial class MainForm
 
             CloseWhenIdleIfRequested();
         }
+
+        return loadCompleted
+            ? loadedModel
+            : null;
     }
 
     /// <summary>
@@ -259,9 +257,6 @@ public sealed partial class MainForm
         ForgetTransformUndoForModel(
             selectedModel);
 
-        _sourceMeshCountByModel.Remove(
-            selectedModel);
-
         _sceneDocument.Remove(
             selectedModel.Id);
 
@@ -272,23 +267,7 @@ public sealed partial class MainForm
         }
         RefreshSceneSidebar();
         UpdateWindowTitle();
-    }
-
-    private void RememberLoadedModelMeshCount(
-        SceneData loadedScene)
-    {
-        if (_sceneDocument.Models.Count == 0)
-        {
-            return;
-        }
-
-        SceneModel loadedModel =
-            _sceneDocument.Models[
-                _sceneDocument.Models.Count - 1];
-
-        _sourceMeshCountByModel[
-            loadedModel] =
-            loadedScene.Meshes.Count;
+        SaveSceneSessionNow();
     }
 
     private void UpdateWindowTitle()
@@ -312,7 +291,7 @@ public sealed partial class MainForm
     /// <summary>
     /// Loads the command-line model, or otherwise restores the last successfully opened model.
     /// </summary>
-    private void TryLoadStartupModel()
+    private async Task RestoreStartupSceneAsync()
     {
         string? startupPath =
             _startupModelPath;
@@ -320,10 +299,16 @@ public sealed partial class MainForm
         if (IsSupportedModelPath(
             startupPath))
         {
-            LoadModelFromPath(
+            await LoadModelFromPathAsync(
                 startupPath!,
-                true);
+                addToScene: false,
+                rememberAsLast: true);
 
+            return;
+        }
+
+        if (await TryRestoreSceneSessionAsync())
+        {
             return;
         }
 
@@ -341,9 +326,10 @@ public sealed partial class MainForm
         if (IsSupportedModelPath(
             lastPath))
         {
-            LoadModelFromPath(
+            await LoadModelFromPathAsync(
                 lastPath,
-                false);
+                addToScene: false,
+                rememberAsLast: false);
         }
     }
 

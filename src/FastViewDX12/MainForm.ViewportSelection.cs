@@ -1,9 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Drawing;
 using System.Numerics;
-using System.Reflection;
 
 namespace FastViewDX12;
 
@@ -14,11 +12,15 @@ public sealed partial class MainForm
     {
         public SceneModelMeshRange(
             SceneModel model,
+            SceneMeshPart? part,
             int firstMeshIndex,
             int meshCount)
         {
             Model =
                 model;
+
+            Part =
+                part;
 
             FirstMeshIndex =
                 firstMeshIndex;
@@ -28,6 +30,8 @@ public sealed partial class MainForm
         }
 
         public SceneModel Model { get; }
+
+        public SceneMeshPart? Part { get; }
 
         public int FirstMeshIndex { get; }
 
@@ -44,18 +48,22 @@ public sealed partial class MainForm
         SceneModel? model =
             TryPickSceneModel(
                 mousePosition,
-                out SceneModel? hitModel)
+                out SceneModel? hitModel,
+                out SceneMeshPart? hitPart)
                 ? hitModel
                 : null;
 
-        if (!TrySetSceneDocumentSelection(
-                model))
+        if (model == null)
         {
-            Debug.WriteLine(
-                "Viewport selection could not update SceneDocument. " +
-                "No compatible selection member was found.");
-
-            return;
+            _sceneDocument.Select(null);
+        }
+        else if (hitPart != null)
+        {
+            _sceneDocument.SelectPart(model, hitPart);
+        }
+        else
+        {
+            _sceneDocument.Select(model);
         }
 
         RefreshSceneSidebar();
@@ -72,6 +80,9 @@ public sealed partial class MainForm
     {
         SceneModel? selectedModel =
             _sceneDocument.SelectedModel;
+
+        SceneMeshPart? selectedPart =
+            _sceneDocument.SelectedPart;
 
         if (selectedModel == null)
         {
@@ -92,6 +103,7 @@ public sealed partial class MainForm
             !TryFindModelRange(
                 ranges,
                 selectedModel,
+                selectedPart,
                 out SceneModelMeshRange selectedRange) ||
             !TryCalculateBounds(
                 renderScene,
@@ -117,9 +129,13 @@ public sealed partial class MainForm
 
     private bool TryPickSceneModel(
         Point mousePosition,
-        out SceneModel? model)
+        out SceneModel? model,
+        out SceneMeshPart? part)
     {
         model =
+            null;
+
+        part =
             null;
 
         if (!_renderer.TryCreateWorldRay(
@@ -180,6 +196,9 @@ public sealed partial class MainForm
 
             model =
                 range.Model;
+
+            part =
+                range.Part;
         }
 
         return model !=
@@ -196,8 +215,7 @@ public sealed partial class MainForm
         out List<SceneModelMeshRange> ranges)
     {
         ranges =
-            new List<SceneModelMeshRange>(
-                _sceneDocument.Models.Count);
+            new List<SceneModelMeshRange>();
 
         int firstMeshIndex =
             0;
@@ -210,43 +228,19 @@ public sealed partial class MainForm
                 _sceneDocument.Models[
                     modelIndex];
 
-            if (!_sourceMeshCountByModel.TryGetValue(
-                    model,
-                    out int meshCount))
+            for (int partIndex = 0;
+                 partIndex < model.Parts.Count;
+                 partIndex++)
             {
-                // One-model scenes are unambiguous, including scenes that
-                // existed before this cache was introduced.
-                if (_sceneDocument.Models.Count == 1)
-                {
-                    meshCount =
-                        renderScene.Meshes.Count;
-                }
-                else
-                {
-                    return false;
-                }
+                ranges.Add(
+                    new SceneModelMeshRange(
+                        model,
+                        model.Parts[partIndex],
+                        firstMeshIndex,
+                        1));
+
+                firstMeshIndex++;
             }
-
-            int remainingMeshCount =
-                Math.Max(
-                    0,
-                    renderScene.Meshes.Count -
-                    firstMeshIndex);
-
-            meshCount =
-                Math.Clamp(
-                    meshCount,
-                    0,
-                    remainingMeshCount);
-
-            ranges.Add(
-                new SceneModelMeshRange(
-                    model,
-                    firstMeshIndex,
-                    meshCount));
-
-            firstMeshIndex +=
-                meshCount;
         }
 
         if (ranges.Count > 0 &&
@@ -263,6 +257,7 @@ public sealed partial class MainForm
                 ranges.Count - 1] =
                 new SceneModelMeshRange(
                     previousLast.Model,
+                    previousLast.Part,
                     previousLast.FirstMeshIndex,
                     previousLast.MeshCount +
                     renderScene.Meshes.Count -
@@ -275,8 +270,12 @@ public sealed partial class MainForm
     private static bool TryFindModelRange(
         List<SceneModelMeshRange> ranges,
         SceneModel model,
+        SceneMeshPart? part,
         out SceneModelMeshRange result)
     {
+        int firstMeshIndex = -1;
+        int meshCount = 0;
+
         foreach (SceneModelMeshRange range in
                  ranges)
         {
@@ -284,11 +283,34 @@ public sealed partial class MainForm
                     range.Model,
                     model))
             {
-                result =
-                    range;
+                if (part != null)
+                {
+                    if (ReferenceEquals(range.Part, part))
+                    {
+                        result = range;
+                        return true;
+                    }
 
-                return true;
+                    continue;
+                }
+
+                if (firstMeshIndex < 0)
+                {
+                    firstMeshIndex = range.FirstMeshIndex;
+                }
+
+                meshCount += range.MeshCount;
             }
+        }
+
+        if (firstMeshIndex >= 0)
+        {
+            result = new SceneModelMeshRange(
+                model,
+                part: null,
+                firstMeshIndex,
+                meshCount);
+            return true;
         }
 
         result =
@@ -666,239 +688,4 @@ public sealed partial class MainForm
             minimumDistance;
     }
 
-    /// <summary>
-    /// SceneDocument already owns selection for the sidebar and gizmo. This
-    /// compatibility adapter calls its existing selection API without adding a
-    /// second, competing selection state.
-    /// </summary>
-    private bool TrySetSceneDocumentSelection(
-        SceneModel? model)
-    {
-        object document =
-            _sceneDocument;
-
-        Type documentType =
-            document.GetType();
-
-        const BindingFlags bindingFlags =
-            BindingFlags.Instance |
-            BindingFlags.Public |
-            BindingFlags.NonPublic;
-
-        if (model == null)
-        {
-            string[] clearMethodNames =
-            [
-                "ClearSelection",
-                "ClearSelectedModel",
-                "Deselect",
-                "DeselectAll"
-            ];
-
-            foreach (string methodName in
-                     clearMethodNames)
-            {
-                MethodInfo? clearMethod =
-                    documentType.GetMethod(
-                        methodName,
-                        bindingFlags,
-                        binder: null,
-                        types: Type.EmptyTypes,
-                        modifiers: null);
-
-                if (clearMethod == null)
-                {
-                    continue;
-                }
-
-                clearMethod.Invoke(
-                    document,
-                    null);
-
-                return true;
-            }
-        }
-
-        string[] selectionMethodNames =
-        [
-            "Select",
-            "SelectModel",
-            "SetSelection",
-            "SetSelected",
-            "SetSelectedModel",
-            "SetSelectedModelId",
-            "SetSelectedId",
-            "SelectSceneModel",
-            "SelectById"
-        ];
-
-        foreach (string methodName in
-                 selectionMethodNames)
-        {
-            MethodInfo[] methods =
-                documentType.GetMethods(
-                    bindingFlags);
-
-            foreach (MethodInfo method in
-                     methods)
-            {
-                if (!method.Name.Equals(
-                        methodName,
-                        StringComparison.Ordinal) ||
-                    method.GetParameters().Length !=
-                    1)
-                {
-                    continue;
-                }
-
-                ParameterInfo parameter =
-                    method.GetParameters()[0];
-
-                if (!TryCreateSelectionValue(
-                        parameter.ParameterType,
-                        model,
-                        out object? value))
-                {
-                    continue;
-                }
-
-                method.Invoke(
-                    document,
-                    [value]);
-
-                return true;
-            }
-        }
-
-        string[] propertyNames =
-        [
-            "SelectedModel",
-            "SelectedModelId",
-            "SelectedId"
-        ];
-
-        foreach (string propertyName in
-                 propertyNames)
-        {
-            PropertyInfo? property =
-                documentType.GetProperty(
-                    propertyName,
-                    bindingFlags);
-
-            if (property?.SetMethod == null ||
-                !TryCreateSelectionValue(
-                    property.PropertyType,
-                    model,
-                    out object? value))
-            {
-                continue;
-            }
-
-            property.SetValue(
-                document,
-                value);
-
-            return true;
-        }
-
-        FieldInfo[] fields =
-            documentType.GetFields(
-                bindingFlags);
-
-        foreach (FieldInfo field in
-                 fields)
-        {
-            if (!field.Name.Contains(
-                    "selected",
-                    StringComparison.OrdinalIgnoreCase) ||
-                !TryCreateSelectionValue(
-                    field.FieldType,
-                    model,
-                    out object? value))
-            {
-                continue;
-            }
-
-            field.SetValue(
-                document,
-                value);
-
-            return true;
-        }
-
-        return false;
-    }
-
-    private static bool TryCreateSelectionValue(
-        Type targetType,
-        SceneModel? model,
-        out object? value)
-    {
-        if (model == null)
-        {
-            if (!targetType.IsValueType ||
-                Nullable.GetUnderlyingType(
-                    targetType) != null)
-            {
-                value =
-                    null;
-
-                return true;
-            }
-
-            if (targetType ==
-                typeof(Guid))
-            {
-                value =
-                    Guid.Empty;
-
-                return true;
-            }
-
-            value =
-                null;
-
-            return false;
-        }
-
-        if (targetType.IsInstanceOfType(
-                model))
-        {
-            value =
-                model;
-
-            return true;
-        }
-
-        object modelId =
-            model.Id;
-
-        if (targetType.IsInstanceOfType(
-                modelId))
-        {
-            value =
-                modelId;
-
-            return true;
-        }
-
-        Type? nullableType =
-            Nullable.GetUnderlyingType(
-                targetType);
-
-        if (nullableType != null &&
-            nullableType.IsInstanceOfType(
-                modelId))
-        {
-            value =
-                modelId;
-
-            return true;
-        }
-
-        value =
-            null;
-
-        return false;
-    }
 }

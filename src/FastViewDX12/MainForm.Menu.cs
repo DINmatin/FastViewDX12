@@ -13,6 +13,14 @@ public sealed partial class MainForm
 
     private ToolStripMenuItem? _shadowsEnabledMenuItem;
 
+    private ToolStripMenuItem? _statisticsMenuItem;
+
+    private ToolStripMenuItem? _spaceMouseCameraMenuItem;
+
+    private ToolStripMenuItem? _environmentLightingMenuItem;
+
+    private ToolStripMenuItem? _directLightMenuItem;
+
     /// <summary>
     /// Builds all File, View, Lighting, and background controls and connects them to renderer commands.
     /// </summary>
@@ -70,7 +78,7 @@ public sealed partial class MainForm
         exportSceneItem.Click +=
             (_, _) =>
             {
-                ExportSceneAsGlb();
+                _ = ExportSceneAsGlb();
             };
 
         var exportPreviewItem =
@@ -134,6 +142,17 @@ public sealed partial class MainForm
             new ToolStripMenuItem(
                 "&View");
 
+        var fullscreenItem =
+            new ToolStripMenuItem(
+                "Fullscreen")
+            {
+                ShortcutKeyDisplayString =
+                    "Alt+Enter"
+            };
+
+        fullscreenItem.Click +=
+            (_, _) => ToggleFullscreen();
+
         var statisticsItem =
             new ToolStripMenuItem(
                 "Statistics")
@@ -143,7 +162,18 @@ public sealed partial class MainForm
             };
 
         statisticsItem.CheckedChanged +=
-            (_, _) => ToggleStatistics();
+            (_, _) =>
+            {
+                if (_statisticsVisible != statisticsItem.Checked)
+                {
+                    ToggleStatistics();
+                }
+
+                UpdateInspectorControlState();
+            };
+
+        _statisticsMenuItem =
+            statisticsItem;
 
         var spaceMouseCameraItem =
             new ToolStripMenuItem(
@@ -154,7 +184,14 @@ public sealed partial class MainForm
             };
 
         spaceMouseCameraItem.CheckedChanged +=
-            (_, _) => SetSpaceMouseCameraMode(spaceMouseCameraItem.Checked);
+            (_, _) =>
+            {
+                SetSpaceMouseCameraMode(spaceMouseCameraItem.Checked);
+                UpdateInspectorControlState();
+            };
+
+        _spaceMouseCameraMenuItem =
+            spaceMouseCameraItem;
 
         var backgroundMenu =
             new ToolStripMenuItem(
@@ -1055,7 +1092,11 @@ public sealed partial class MainForm
                     environmentEnabledItem.Checked;
 
                 ScheduleViewerSettingsSave();
+                UpdateInspectorControlState();
             };
+
+        _environmentLightingMenuItem =
+            environmentEnabledItem;
 
         var directLightEnabledItem =
             new ToolStripMenuItem(
@@ -1079,7 +1120,11 @@ public sealed partial class MainForm
                     directLightEnabledItem.Checked;
 
                 ScheduleViewerSettingsSave();
+                UpdateInspectorControlState();
             };
+
+        _directLightMenuItem =
+            directLightEnabledItem;
 
         int savedEnvironmentIntensityPercent =
             Math.Clamp(
@@ -1169,6 +1214,12 @@ public sealed partial class MainForm
 
         viewMenu.DropDownItems.Add(
             backgroundMenu);
+
+        viewMenu.DropDownItems.Add(
+            fullscreenItem);
+
+        viewMenu.DropDownItems.Add(
+            new ToolStripSeparator());
 
         viewMenu.DropDownItems.Add(
             statisticsItem);
@@ -1287,7 +1338,8 @@ public sealed partial class MainForm
     /// are baked into the exported geometry; editor grid, gizmos, background,
     /// camera, and post-processing remain viewport-only.
     /// </summary>
-    private void ExportSceneAsGlb()
+    private bool ExportSceneAsGlb(
+        bool showSuccessMessage = true)
     {
         if (_sceneDocument.Models.Count ==
             0)
@@ -1299,7 +1351,7 @@ public sealed partial class MainForm
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information);
 
-            return;
+            return false;
         }
 
         using var dialog =
@@ -1330,7 +1382,7 @@ public sealed partial class MainForm
         if (dialog.ShowDialog(this) !=
             DialogResult.OK)
         {
-            return;
+            return false;
         }
 
         try
@@ -1345,12 +1397,22 @@ public sealed partial class MainForm
                 exportScene,
                 dialog.FileName);
 
-            MessageBox.Show(
-                this,
-                $"Scene exported successfully.\n\n{dialog.FileName}",
-                "Export scene",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Information);
+            _sceneTransformsDirty =
+                false;
+
+            SaveSceneSessionNow();
+
+            if (showSuccessMessage)
+            {
+                MessageBox.Show(
+                    this,
+                    $"Scene exported successfully.\n\n{dialog.FileName}",
+                    "Export scene",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+            }
+
+            return true;
         }
         catch (Exception ex)
         {
@@ -1363,6 +1425,8 @@ public sealed partial class MainForm
                 "Scene export failed",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
+
+            return false;
         }
         finally
         {
