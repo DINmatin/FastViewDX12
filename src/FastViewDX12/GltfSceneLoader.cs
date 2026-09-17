@@ -1,4 +1,5 @@
 using SharpGLTF.Schema2;
+using SharpGLTF.Validation;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -33,7 +34,7 @@ public static class GltfSceneLoader
                 path);
         }
 
-        ModelRoot model = ModelRoot.Load(path);
+        ModelRoot model = LoadModelRoot(path);
 
         Scene? scene =
             model.DefaultScene ??
@@ -72,6 +73,64 @@ public static class GltfSceneLoader
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Keeps SharpGLTF's strict validation for normal files, but permits a
+    /// second pass when the only reported problem is malformed vertex normals.
+    /// The normal data is sanitized later while building the renderer meshes.
+    /// </summary>
+    private static ModelRoot LoadModelRoot(string path)
+    {
+        try
+        {
+            return ModelRoot.Load(path);
+        }
+        catch (ModelException ex)
+            when (IsInvalidNormalValidationFailure(ex))
+        {
+            Debug.WriteLine(
+                "glTF contains invalid vertex normals; " +
+                "retrying with targeted normal repair: " +
+                ex.Message);
+
+            return ModelRoot.Load(
+                path,
+                new ReadSettings
+                {
+                    Validation = ValidationMode.TryFix
+                });
+        }
+    }
+
+    /// <summary>
+    /// Restricts the tolerant retry to SharpGLTF diagnostics that identify a
+    /// NORMAL accessor. Other malformed glTF data still fails strict loading.
+    /// </summary>
+    private static bool IsInvalidNormalValidationFailure(
+        Exception exception)
+    {
+        for (Exception? current = exception;
+             current != null;
+             current = current.InnerException)
+        {
+            string message = current.Message;
+
+            if (message.Contains(
+                    "Invalid Normal",
+                    StringComparison.OrdinalIgnoreCase) ||
+                (message.Contains(
+                     "NORMAL[",
+                     StringComparison.OrdinalIgnoreCase) &&
+                 message.Contains(
+                     "invalid",
+                     StringComparison.OrdinalIgnoreCase)))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>
@@ -668,6 +727,17 @@ public static class GltfSceneLoader
                 indices);
         }
 
+        bool hasInvalidSourceNormal =
+            sourceNormals.Any(
+                normal => !IsUsableDirection(normal));
+
+        Vector3[] repairedNormals =
+            hasInvalidSourceNormal
+                ? CalculateSmoothNormals(
+                    positions,
+                    indices)
+                : Array.Empty<Vector3>();
+
         Matrix4x4 normalMatrix = world;
 
         if (Matrix4x4.Invert(
@@ -684,15 +754,25 @@ public static class GltfSceneLoader
 
         for (int i = 0; i < sourceNormals.Length; i++)
         {
-            Vector3 normal =
+            Vector3 sourceNormal = sourceNormals[i];
+
+            if (!IsUsableDirection(sourceNormal))
+            {
+                result[i] = repairedNormals[i];
+                continue;
+            }
+
+            Vector3 transformedNormal =
                 Vector3.TransformNormal(
-                    sourceNormals[i],
+                    sourceNormal,
                     normalMatrix);
 
             result[i] =
-                NormalizeOrFallback(
-                    normal,
-                    Vector3.UnitY);
+                IsUsableDirection(transformedNormal)
+                    ? Vector3.Normalize(transformedNormal)
+                    : repairedNormals.Length == positions.Length
+                        ? repairedNormals[i]
+                        : Vector3.UnitY;
         }
 
         return result;
@@ -1261,10 +1341,22 @@ public static class GltfSceneLoader
         Vector3 value,
         Vector3 fallback)
     {
-        return value.LengthSquared() >
-               0.00000001f
+        return IsUsableDirection(value)
             ? Vector3.Normalize(value)
             : fallback;
+    }
+
+    /// <summary>
+    /// Rejects zero-length and non-finite direction vectors before they reach
+    /// normalization, which would otherwise produce NaNs.
+    /// </summary>
+    private static bool IsUsableDirection(Vector3 value)
+    {
+        return
+            float.IsFinite(value.X) &&
+            float.IsFinite(value.Y) &&
+            float.IsFinite(value.Z) &&
+            value.LengthSquared() > 0.00000001f;
     }
 
     /// <summary>

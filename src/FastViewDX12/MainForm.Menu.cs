@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
+using SharpGLTF.Schema2;
 
 namespace FastViewDX12;
 
@@ -81,6 +82,17 @@ public sealed partial class MainForm
                 _ = ExportSceneAsGlb();
             };
 
+        var saveCompliantItem =
+            new ToolStripMenuItem(
+                "Save compliant GLB...");
+
+        saveCompliantItem.Click +=
+            (_, _) =>
+            {
+                _ = ExportSceneAsGlb(
+                    saveCompliantCopy: true);
+            };
+
         var exportPreviewItem =
             new ToolStripMenuItem(
                 "Export preview PNG...");
@@ -120,6 +132,9 @@ public sealed partial class MainForm
             exportSceneItem);
 
         fileMenu.DropDownItems.Add(
+            saveCompliantItem);
+
+        fileMenu.DropDownItems.Add(
             exportPreviewItem);
 
         fileMenu.DropDownItems.Add(
@@ -129,6 +144,10 @@ public sealed partial class MainForm
             (_, _) =>
             {
                 exportSceneItem.Enabled =
+                    _sceneDocument.Models.Count >
+                    0;
+
+                saveCompliantItem.Enabled =
                     _sceneDocument.Models.Count >
                     0;
 
@@ -1339,7 +1358,8 @@ public sealed partial class MainForm
     /// camera, and post-processing remain viewport-only.
     /// </summary>
     private bool ExportSceneAsGlb(
-        bool showSuccessMessage = true)
+        bool showSuccessMessage = true,
+        bool saveCompliantCopy = false)
     {
         if (_sceneDocument.Models.Count ==
             0)
@@ -1358,7 +1378,9 @@ public sealed partial class MainForm
             new SaveFileDialog
             {
                 Title =
-                    "Export FastView scene as GLB",
+                    saveCompliantCopy
+                        ? "Save standards-compliant GLB"
+                        : "Export FastView scene as GLB",
 
                 Filter =
                     "GLB scene (*.glb)|*.glb",
@@ -1376,7 +1398,8 @@ public sealed partial class MainForm
                     true,
 
                 FileName =
-                    CreateDefaultSceneExportFileName()
+                    CreateDefaultSceneExportFileName(
+                        saveCompliantCopy)
             };
 
         if (dialog.ShowDialog(this) !=
@@ -1397,6 +1420,12 @@ public sealed partial class MainForm
                 exportScene,
                 dialog.FileName);
 
+            if (saveCompliantCopy)
+            {
+                _ = ModelRoot.Load(
+                    dialog.FileName);
+            }
+
             _sceneTransformsDirty =
                 false;
 
@@ -1406,8 +1435,12 @@ public sealed partial class MainForm
             {
                 MessageBox.Show(
                     this,
-                    $"Scene exported successfully.\n\n{dialog.FileName}",
-                    "Export scene",
+                    saveCompliantCopy
+                        ? $"Compliant GLB saved and validated successfully.\n\n{dialog.FileName}"
+                        : $"Scene exported successfully.\n\n{dialog.FileName}",
+                    saveCompliantCopy
+                        ? "Save compliant GLB"
+                        : "Export scene",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information);
             }
@@ -1422,7 +1455,9 @@ public sealed partial class MainForm
             MessageBox.Show(
                 this,
                 ex.Message,
-                "Scene export failed",
+                saveCompliantCopy
+                    ? "Compliant GLB save failed"
+                    : "Scene export failed",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
 
@@ -1435,7 +1470,8 @@ public sealed partial class MainForm
         }
     }
 
-    private string CreateDefaultSceneExportFileName()
+    private string CreateDefaultSceneExportFileName(
+        bool compliantCopy = false)
     {
         string baseName =
             _sceneDocument.Models.Count ==
@@ -1460,7 +1496,9 @@ public sealed partial class MainForm
         }
 
         return
-            $"{baseName}_scene.glb";
+            compliantCopy
+                ? $"{baseName}_compliant.glb"
+                : $"{baseName}_scene.glb";
     }
 
     /// <summary>

@@ -4,6 +4,17 @@
 
 No unreleased changes yet.
 
+## 1.5.1 - 2026-09-17
+
+### Added
+
+* Added **File → Save compliant GLB...** to export the current scene as a repaired, self-contained GLB and immediately verify it with strict glTF validation.
+
+### Fixed
+
+* GLB files containing malformed vertex normals from tools such as trimesh now load through a targeted repair pass instead of failing completely.
+* Zero-length and non-finite normals are regenerated from the mesh geometry before rendering, thumbnail generation, and export.
+
 ## 1.5.0 - 2026-08-25
 
 ### Added
