@@ -299,7 +299,7 @@ internal static class Program
         if (!ModelSceneLoader.IsSupportedPath(inputPath))
         {
             errorMessage =
-                "The input file must be a GLB, glTF, FBX, or OBJ file.";
+                "The input file must be a GLB, glTF, FBX, STL, or OBJ file.";
 
             return false;
         }

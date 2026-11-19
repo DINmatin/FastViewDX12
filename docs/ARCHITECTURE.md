@@ -6,7 +6,7 @@ FastView is intentionally split into two processes. The interactive viewer owns 
 
 - `Program.cs` selects interactive or `--thumbnail` startup before WinForms visual-style initialization.
 - `MainForm*.cs` contains only the WinForms shell: menus, dialogs, input routing, model selection, and the idle render loop.
-- `ModelSceneLoader.cs` dispatches GLB/glTF, FBX, and OBJ input into renderer-neutral `SceneData`.
+- `ModelSceneLoader.cs` dispatches GLB/glTF, FBX, STL, and OBJ input into renderer-neutral `SceneData`.
 - `GltfSceneLoader.cs`, `AssimpFbxSceneLoader.cs`, and `ObjSceneLoader.cs` own their respective parsing paths.
 - `Dx12Renderer.cs` owns shared state and disposal. Focused partial files contain device setup, scene upload, background rendering, frame rendering, interaction, and PNG capture.
 - `CameraController.cs` and `LightController.cs` contain interaction math without Direct3D resource ownership.
@@ -16,7 +16,7 @@ FastView is intentionally split into two processes. The interactive viewer owns 
 ## `FastView.ThumbnailProvider`
 
 - `FastViewThumbnailProvider` accepts GLB data through `IInitializeWithStream`.
-- `FastViewGltfThumbnailProvider` accepts an original path through `IInitializeWithFile`, preserving access to external BIN and texture files.
+- `FastViewGltfThumbnailProvider` accepts an original path through `IInitializeWithFile` for glTF, FBX, STL, and OBJ, preserving access to adjacent resources.
 - `ThumbnailProviderCore*.cs` launches `FastViewDX12.exe --thumbnail`, converts the resulting PNG into a premultiplied ARGB HBITMAP, and performs best-effort diagnostics and cleanup.
 
 ## Ownership rules

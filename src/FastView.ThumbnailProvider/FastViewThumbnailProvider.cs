@@ -106,7 +106,7 @@ public sealed class FastViewThumbnailProvider :
 }
 
 /// <summary>
-/// Explorer thumbnail provider for glTF files that may reference neighboring BIN and texture files.
+/// Explorer thumbnail provider for path-based model formats, including glTF, FBX, STL, and OBJ.
 /// </summary>
 [ComVisible(true)]
 [ClassInterface(ClassInterfaceType.None)]
@@ -121,7 +121,7 @@ public sealed class FastViewGltfThumbnailProvider :
     private string? _sourcePath;
 
     /// <summary>
-    /// Stores the original glTF path so external buffers and textures remain resolvable.
+    /// Stores the original model path so external buffers and textures remain resolvable.
     /// </summary>
     public int Initialize(
         string filePath,
@@ -142,7 +142,7 @@ public sealed class FastViewGltfThumbnailProvider :
     }
 
     /// <summary>
-    /// Renders the original glTF path and returns a premultiplied ARGB bitmap to Explorer.
+    /// Renders the original model path and returns a premultiplied ARGB bitmap to Explorer.
     /// </summary>
     public int GetThumbnail(
         uint size,
@@ -161,14 +161,14 @@ public sealed class FastViewGltfThumbnailProvider :
                 _sourcePath))
             {
                 throw new InvalidOperationException(
-                    "The glTF thumbnail provider was not initialized.");
+                    "The model thumbnail provider was not initialized.");
             }
 
             if (!File.Exists(
                 _sourcePath))
             {
                 throw new FileNotFoundException(
-                    "The glTF source file was not found.",
+                    "The model source file was not found.",
                     _sourcePath);
             }
 
@@ -182,7 +182,11 @@ public sealed class FastViewGltfThumbnailProvider :
         catch (Exception exception)
         {
             ThumbnailProviderCore.TryWriteDiagnosticLog(
-                "glTF",
+                Path.GetExtension(_sourcePath ?? string.Empty)
+                    .TrimStart('.')
+                    .ToUpperInvariant() is { Length: > 0 } formatName
+                        ? formatName
+                        : "Model",
                 exception);
 
             bitmapHandle =

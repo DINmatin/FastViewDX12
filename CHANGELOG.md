@@ -4,6 +4,17 @@
 
 No unreleased changes yet.
 
+## 1.6.0 - 2026-11-19
+
+### Added
+
+* Added STL import in the viewer, including File Open, drag-and-drop, command-line loading, scene recovery, and thumbnail rendering.
+* Added Windows Explorer thumbnail registration and **Open with FastView** support for `.stl` files.
+
+### Changed
+
+* Generalized the file-based Explorer thumbnail provider diagnostics shared by glTF, FBX, STL, and OBJ files.
+
 ## 1.5.1 - 2026-09-17
 
 ### Added

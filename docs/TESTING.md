@@ -5,7 +5,7 @@
 1. Build `FastView.slnx` in `Release | x64`.
 2. Open one embedded `.glb`.
 3. Open one `.gltf` with an external `.bin` and at least one external texture.
-4. Open one FBX with embedded textures and one OBJ with an adjacent MTL file.
+4. Open one FBX with embedded textures, one STL, and one OBJ with an adjacent MTL file.
 5. Confirm orbit, pan, zoom, fit-to-scene, direct light, and environment lighting.
 6. Drag a supported and unsupported file over the viewport and verify `DROP HERE` / `WRONG FORMAT`.
 7. Create a preview video with `Ctrl+Shift+V`; verify 1920 x 1080 H.264, a complete orbit, and camera restoration.
@@ -22,7 +22,7 @@
 start "" /wait "C:\path\FastViewDX12.exe" --thumbnail "C:\path\model.glb" "C:\Temp\FastView-glb.png" 768 768
 ```
 
-Repeat with `.gltf`, `.fbx`, and `.obj` files that reference external files. Confirm:
+Repeat with `.gltf`, `.fbx`, `.stl`, and `.obj` files. Confirm:
 
 - exit code is `0`,
 - PNG exists,
@@ -35,8 +35,8 @@ Repeat with `.gltf`, `.fbx`, and `.obj` files that reference external files. Con
 After installing:
 
 1. Restart Explorer when prompted.
-2. Open a folder containing GLB, glTF, FBX, and OBJ files in large-icon view.
-3. Confirm transparent thumbnails for all four formats.
+2. Open a folder containing GLB, glTF, FBX, STL, and OBJ files in large-icon view.
+3. Confirm transparent thumbnails for all five formats.
 4. Confirm a glTF with adjacent `.bin` and texture files renders correctly.
 5. Rename or temporarily remove a referenced texture and confirm the provider fails cleanly rather than hanging Explorer.
 

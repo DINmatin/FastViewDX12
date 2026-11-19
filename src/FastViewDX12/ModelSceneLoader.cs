@@ -8,6 +8,7 @@ public static class ModelSceneLoader
             ".glb",
             ".gltf",
             ".fbx",
+            ".stl",
             ".obj"
         };
 
@@ -26,7 +27,8 @@ public static class ModelSceneLoader
     {
         string extension = Path.GetExtension(path);
 
-        if (extension.Equals(".fbx", StringComparison.OrdinalIgnoreCase))
+        if (extension.Equals(".fbx", StringComparison.OrdinalIgnoreCase) ||
+            extension.Equals(".stl", StringComparison.OrdinalIgnoreCase))
         {
             return AssimpFbxSceneLoader.LoadFromFile(
                 path,

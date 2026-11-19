@@ -1,6 +1,6 @@
 #define MyAppName "FastView"
 #ifndef MyAppVersion
-  #define MyAppVersion "1.5.1"
+  #define MyAppVersion "1.6.0"
 #endif
 #define MyAppExeName "FastViewDX12.exe"
 #define MyProviderComHost "FastView.ThumbnailProvider.comhost.dll"
@@ -58,15 +58,20 @@ Source: "Payload\{#MyProviderComHost}"; DestDir: "{app}"; Flags: ignoreversion r
 Root: HKLM64; Subkey: "Software\Classes\SystemFileAssociations\.glb\ShellEx\{{E357FCCD-A995-4576-B01F-234630154E96}"; ValueType: string; ValueName: ""; ValueData: "{{A2A86C88-5B89-4D5E-92B3-7A6CF4E0A1B7}"; Flags: uninsdeletevalue
 Root: HKLM64; Subkey: "Software\Classes\SystemFileAssociations\.gltf\ShellEx\{{E357FCCD-A995-4576-B01F-234630154E96}"; ValueType: string; ValueName: ""; ValueData: "{{6B07920A-CFEC-42E6-B718-73A199156EFD}"; Flags: uninsdeletevalue
 Root: HKLM64; Subkey: "Software\Classes\SystemFileAssociations\.fbx\ShellEx\{{E357FCCD-A995-4576-B01F-234630154E96}"; ValueType: string; ValueName: ""; ValueData: "{{6B07920A-CFEC-42E6-B718-73A199156EFD}"; Flags: uninsdeletevalue
+Root: HKLM64; Subkey: "Software\Classes\SystemFileAssociations\.stl\ShellEx\{{E357FCCD-A995-4576-B01F-234630154E96}"; ValueType: string; ValueName: ""; ValueData: "{{6B07920A-CFEC-42E6-B718-73A199156EFD}"; Flags: uninsdeletevalue
 Root: HKLM64; Subkey: "Software\Classes\SystemFileAssociations\.obj\ShellEx\{{E357FCCD-A995-4576-B01F-234630154E96}"; ValueType: string; ValueName: ""; ValueData: "{{6B07920A-CFEC-42E6-B718-73A199156EFD}"; Flags: uninsdeletevalue
 
-; glTF, FBX, and OBJ may reference adjacent resources. The file-based handler
-; therefore needs the original path instead of an isolated file stream.
+; glTF, FBX, STL, and OBJ use the file-based handler. Some of these formats
+; may reference adjacent resources, so the handler needs the original path
+; instead of an isolated file stream.
 Root: HKLM64; Subkey: "Software\Classes\CLSID\{{6B07920A-CFEC-42E6-B718-73A199156EFD}"; ValueType: dword; ValueName: "DisableProcessIsolation"; ValueData: "1"; Flags: uninsdeletevalue
 
 ; Large multi-resolution fallback icon (16 through 256 px)
 Root: HKLM64; Subkey: "Software\Classes\SystemFileAssociations\.glb\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\Assets\Icons\GlbFile.ico,0"; Flags: uninsdeletevalue
 Root: HKLM64; Subkey: "Software\Classes\SystemFileAssociations\.gltf\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\Assets\Icons\GlbFile.ico,0"; Flags: uninsdeletevalue
+Root: HKLM64; Subkey: "Software\Classes\SystemFileAssociations\.fbx\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\Assets\Icons\GlbFile.ico,0"; Flags: uninsdeletevalue
+Root: HKLM64; Subkey: "Software\Classes\SystemFileAssociations\.stl\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\Assets\Icons\GlbFile.ico,0"; Flags: uninsdeletevalue
+Root: HKLM64; Subkey: "Software\Classes\SystemFileAssociations\.obj\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\Assets\Icons\GlbFile.ico,0"; Flags: uninsdeletevalue
 
 ; Offer FastView in Open with, without replacing the user's default app.
 Root: HKLM64; Subkey: "Software\Classes\Applications\{#MyAppExeName}"; ValueType: string; ValueName: "FriendlyAppName"; ValueData: "FastView"; Flags: uninsdeletekey
@@ -74,6 +79,7 @@ Root: HKLM64; Subkey: "Software\Classes\Applications\{#MyAppExeName}\shell\open\
 Root: HKLM64; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".glb"; ValueData: ""
 Root: HKLM64; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".gltf"; ValueData: ""
 Root: HKLM64; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".fbx"; ValueData: ""
+Root: HKLM64; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".stl"; ValueData: ""
 Root: HKLM64; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".obj"; ValueData: ""
 
 Root: HKLM64; Subkey: "Software\Microsoft\Windows\CurrentVersion\App Paths\{#MyAppExeName}"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName}"; Flags: uninsdeletekey
@@ -84,6 +90,10 @@ Name: "{autoprograms}\FastView"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: 
 Name: "{autodesktop}\FastView"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
+; comhost registration can recreate the CLSID key after the [Registry]
+; entries have been applied. Set this value once more before Explorer is
+; restarted so path-based thumbnail handlers are activated out of process.
+Filename: "{sys}\reg.exe"; Parameters: "ADD ""HKLM\Software\Classes\CLSID\{{#GltfProviderClsid}"" /v DisableProcessIsolation /t REG_DWORD /d 1 /f /reg:64"; Flags: runhidden waituntilterminated
 Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM dllhost.exe"; Flags: runhidden waituntilterminated
 Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM explorer.exe"; Flags: runhidden waituntilterminated; Tasks: restartexplorer
 Filename: "{win}\explorer.exe"; Flags: nowait runasoriginaluser; Tasks: restartexplorer

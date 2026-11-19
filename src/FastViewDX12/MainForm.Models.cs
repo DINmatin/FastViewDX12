@@ -50,11 +50,12 @@ public sealed partial class MainForm
                         : "Open model",
 
                 Filter =
-                    "Supported models (*.glb;*.gltf;*.fbx;*.obj)|*.glb;*.gltf;*.fbx;*.obj|" +
+                    "Supported models (*.glb;*.gltf;*.fbx;*.stl;*.obj)|*.glb;*.gltf;*.fbx;*.stl;*.obj|" +
                     "glTF models (*.glb;*.gltf)|*.glb;*.gltf|" +
                     "GLB files (*.glb)|*.glb|" +
                     "glTF files (*.gltf)|*.gltf|" +
                     "Autodesk FBX (*.fbx)|*.fbx|" +
+                    "STL models (*.stl)|*.stl|" +
                     "Wavefront OBJ (*.obj)|*.obj",
 
                 CheckFileExists =

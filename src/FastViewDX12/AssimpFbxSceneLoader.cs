@@ -32,15 +32,16 @@ public static class AssimpFbxSceneLoader
 
         if (!File.Exists(path))
         {
-            throw new FileNotFoundException("FBX file not found.", path);
+            throw new FileNotFoundException("Model file not found.", path);
         }
 
         string fullPath = Path.GetFullPath(path);
         string fileName = Path.GetFileName(fullPath);
+        string formatName = Path.GetExtension(fullPath).TrimStart('.').ToUpperInvariant();
 
         progress?.Report(new ModelLoadProgress(
             ModelLoadStage.ReadingFile,
-            "Reading FBX file",
+            $"Reading {formatName} file",
             fileName));
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -52,7 +53,7 @@ public static class AssimpFbxSceneLoader
         {
             progress?.Report(new ModelLoadProgress(
                 ModelLoadStage.ParsingScene,
-                "Parsing FBX scene",
+                $"Parsing {formatName} scene",
                 fileName));
 
             imported = context.ImportFile(fullPath, ImportSteps);
@@ -62,7 +63,7 @@ public static class AssimpFbxSceneLoader
 
         if (imported == null || !imported.HasMeshes)
         {
-            throw new InvalidDataException("The FBX file contains no meshes.");
+            throw new InvalidDataException($"The {formatName} file contains no meshes.");
         }
 
         var result = new SceneData();
@@ -98,14 +99,14 @@ public static class AssimpFbxSceneLoader
                     imported.Meshes.Count));
 
                 Debug.WriteLine(
-                    $"FBX mesh '{mesh.Name}': vertices={mesh.Positions.Length}, " +
+                    $"{formatName} mesh '{mesh.Name}': vertices={mesh.Positions.Length}, " +
                     $"indices={mesh.Indices.Length}, material={mesh.MaterialIndex}");
             }
         }
 
         if (result.Meshes.Count == 0)
         {
-            throw new InvalidDataException("The FBX file contains no triangle meshes.");
+            throw new InvalidDataException($"The {formatName} file contains no triangle meshes.");
         }
 
         return result;
