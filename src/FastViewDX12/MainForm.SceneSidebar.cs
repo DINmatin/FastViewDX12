@@ -562,6 +562,14 @@ public sealed partial class MainForm
                     CreateTransformInspector(
                         model,
                         contentWidth));
+
+                if (model.HasAnimations)
+                {
+                    modelPanel.Controls.Add(
+                        CreateAnimationInspector(
+                            model,
+                            contentWidth));
+                }
             }
 
             foreach (SceneMeshPart part in model.Parts)

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Runtime.InteropServices;
 using Vortice.Direct3D12;
 using Vortice.DXGI;
@@ -94,7 +95,7 @@ public sealed partial class Dx12Renderer
 
     private sealed class GpuRenderItem : IDisposable
     {
-        public MeshData Mesh { get; }
+        public MeshData Mesh { get; set; }
 
         public GpuMaterial Material { get; }
 
@@ -114,7 +115,7 @@ public sealed partial class Dx12Renderer
 
         public bool UsesIndexBuffer { get; }
 
-        public System.Numerics.Vector3 Center { get; }
+        public System.Numerics.Vector3 Center { get; set; }
 
         public GpuRenderItem(
             MeshData mesh,
@@ -890,6 +891,94 @@ public sealed partial class Dx12Renderer
         }
 
         MarkShadowMapDirty();
+    }
+
+    /// <summary>
+    /// Updates only upload-heap vertex buffers. Animation uses this path so
+    /// textures, descriptors, index buffers and constant buffers stay alive.
+    /// </summary>
+    public void UpdateAnimatedSceneGeometry(SceneData scene)
+    {
+        ArgumentNullException.ThrowIfNull(scene);
+
+        if (!_initialized)
+        {
+            return;
+        }
+
+        var meshesByName = new Dictionary<string, Queue<MeshData>>(StringComparer.Ordinal);
+        foreach (MeshData mesh in scene.Meshes)
+        {
+            if (!meshesByName.TryGetValue(mesh.Name, out Queue<MeshData>? matches))
+            {
+                matches = new Queue<MeshData>();
+                meshesByName.Add(mesh.Name, matches);
+            }
+
+            matches.Enqueue(mesh);
+        }
+
+        WaitForGpu();
+
+        foreach (GpuRenderItem item in _opaqueItems.Concat(_blendItems))
+        {
+            if (!meshesByName.TryGetValue(item.Mesh.Name, out Queue<MeshData>? matches) ||
+                matches.Count == 0)
+            {
+                UpdateSceneGeometry(scene);
+                return;
+            }
+
+            MeshData mesh = matches.Dequeue();
+            if ((uint)mesh.Positions.Length != item.VertexCount)
+            {
+                UpdateSceneGeometry(scene);
+                return;
+            }
+
+            item.VertexBuffer.SetData(CreateAnimatedVertices(mesh, item.Material));
+            item.Mesh = mesh;
+            item.Center = CalculateCenter(mesh.Positions);
+        }
+
+        _scene = scene;
+        MarkShadowMapDirty();
+    }
+
+    private static VertexPositionNormalTangentTexture[] CreateAnimatedVertices(
+        MeshData mesh,
+        GpuMaterial material)
+    {
+        var vertices = new VertexPositionNormalTangentTexture[mesh.Positions.Length];
+        bool normalsValid = mesh.Normals.Length == mesh.Positions.Length;
+        bool tangentsValid = mesh.Tangents.Length == mesh.Positions.Length;
+        bool texCoords0Valid = mesh.TexCoords0.Length == mesh.Positions.Length;
+        bool texCoords1Valid = mesh.TexCoords1.Length == mesh.Positions.Length;
+
+        for (int index = 0; index < mesh.Positions.Length; index++)
+        {
+            System.Numerics.Vector3 normal = normalsValid
+                ? mesh.Normals[index]
+                : System.Numerics.Vector3.UnitY;
+            normal = normal.LengthSquared() > 0.000001f
+                ? System.Numerics.Vector3.Normalize(normal)
+                : System.Numerics.Vector3.UnitY;
+            System.Numerics.Vector4 tangent = tangentsValid
+                ? mesh.Tangents[index]
+                : CreateFallbackTangent(normal);
+            MaterialData source = material.Source;
+
+            vertices[index] = new VertexPositionNormalTangentTexture(
+                mesh.Positions[index],
+                normal,
+                tangent,
+                ResolveTextureCoordinate(mesh, source.BaseColorTextureMapping, index, texCoords0Valid, texCoords1Valid),
+                ResolveTextureCoordinate(mesh, source.NormalTextureMapping, index, texCoords0Valid, texCoords1Valid),
+                ResolveTextureCoordinate(mesh, source.MetallicRoughnessTextureMapping, index, texCoords0Valid, texCoords1Valid),
+                ResolveTextureCoordinate(mesh, source.EmissiveTextureMapping, index, texCoords0Valid, texCoords1Valid));
+        }
+
+        return vertices;
     }
 
     /// <summary>

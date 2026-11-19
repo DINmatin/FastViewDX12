@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using SharpGLTF.Schema2;
 
 namespace FastViewDX12;
 
@@ -24,11 +25,15 @@ public enum MeshAlphaMode
 /// </summary>
 public sealed class SceneData
 {
+    internal ModelRoot? SourceGltfModel { get; set; }
     /// <summary>Gets the unique material definitions referenced by scene meshes.</summary>
     public List<MaterialData> Materials { get; } = new();
 
     /// <summary>Gets the flattened glTF mesh primitives ready for GPU upload.</summary>
     public List<MeshData> Meshes { get; } = new();
+
+    /// <summary>Gets the animation clips embedded in the source glTF file.</summary>
+    public List<SceneAnimationClip> Animations { get; } = new();
 
     public void ReleaseEncodedTextureData()
     {
@@ -40,6 +45,28 @@ public sealed class SceneData
             material.EmissiveTextureBytes = null;
         }
     }
+}
+
+/// <summary>
+/// A renderer-neutral animation clip which updates the flattened meshes in its
+/// owning <see cref="SceneData"/> when sampled.
+/// </summary>
+public abstract class SceneAnimationClip
+{
+    protected SceneAnimationClip(string name, float duration)
+    {
+        Name = string.IsNullOrWhiteSpace(name) ? "Animation" : name;
+        Duration = MathF.Max(0.0f, duration);
+    }
+
+    public string Name { get; }
+
+    public float Duration { get; }
+
+    /// <summary>Samples the clip and updates its mesh vertex attributes.</summary>
+    public abstract void Apply(float timeSeconds);
+
+    public override string ToString() => Name;
 }
 
 public enum MaterialTextureKind

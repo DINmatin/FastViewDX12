@@ -6,6 +6,8 @@ using System.Numerics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using SharpGLTF.Schema2;
+using SharpGLTF.Validation;
 
 namespace FastViewDX12;
 
@@ -86,6 +88,82 @@ public static class GltfSceneExporter
 
         builder.WriteGlb(
             fullPath);
+    }
+
+    /// <summary>
+    /// Exports an editable document while retaining a source glTF skeleton,
+    /// skin and all animation channels when an animated model is present.
+    /// </summary>
+    public static void ExportDocumentGlb(
+        SceneDocument document,
+        string outputPath)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        ArgumentException.ThrowIfNullOrWhiteSpace(outputPath);
+
+        SceneModel[] animatedModels = document.Models
+            .Where(model => model.HasAnimations)
+            .ToArray();
+
+        if (animatedModels.Length == 0)
+        {
+            ExportGlb(document.BuildRenderScene(), outputPath);
+            return;
+        }
+
+        if (document.Models.Count != 1 || animatedModels.Length != 1)
+        {
+            throw new InvalidOperationException(
+                "Animation-preserving GLB export currently requires exactly one loaded model. " +
+                "Export animated models separately so no clips or skeletons are lost.");
+        }
+
+        SceneModel sceneModel = animatedModels[0];
+        ModelRoot? retainedModel = sceneModel.SourceScene.SourceGltfModel;
+        if (retainedModel == null)
+        {
+            throw new InvalidOperationException(
+                "The source glTF hierarchy required for animation export is unavailable.");
+        }
+
+        foreach (SceneMeshPart part in sceneModel.Parts)
+        {
+            if (!part.CreateTransform().Equals(Matrix4x4.Identity))
+            {
+                throw new InvalidOperationException(
+                    "Animation-preserving export cannot bake individual sub-mesh transforms yet. " +
+                    "Reset the part transforms or export the unanimated current pose.");
+            }
+        }
+
+        ModelRoot exportModel = retainedModel.DeepClone();
+        Scene? scene = exportModel.DefaultScene ?? exportModel.LogicalScenes.FirstOrDefault();
+        if (scene == null)
+        {
+            throw new InvalidDataException("The animated glTF contains no scene.");
+        }
+
+        Matrix4x4 modelTransform = sceneModel.CreateTransform();
+        foreach (Node root in scene.VisualChildren.ToArray())
+        {
+            root.WorldMatrix = root.WorldMatrix * modelTransform;
+        }
+
+        string fullPath = Path.GetFullPath(outputPath);
+        string? directory = Path.GetDirectoryName(fullPath);
+        if (!string.IsNullOrWhiteSpace(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        exportModel.SaveGLB(
+            fullPath,
+            new WriteSettings
+            {
+                Validation = ValidationMode.TryFix,
+                MergeBuffers = true,
+                JsonIndented = true
+            });
     }
 
     private sealed class ExportBuilder

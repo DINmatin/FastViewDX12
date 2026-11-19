@@ -21,6 +21,10 @@ public sealed partial class MainForm : Form
 
     private readonly SceneDocument _sceneDocument = new();
 
+    private readonly Stopwatch _animationClock = Stopwatch.StartNew();
+
+    private long _lastAnimationTimestamp;
+
     private OperationProgressOverlay _progressOverlay = null!;
 
     private DropFeedbackOverlay _dropOverlay = null!;
@@ -238,6 +242,7 @@ public sealed partial class MainForm : Form
 
         while (AppStillIdle)
         {
+            UpdateSceneAnimations();
             _renderer.Render();
             CountRenderedFrame();
             UpdateMoveGizmoOverlay();

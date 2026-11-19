@@ -397,6 +397,64 @@ public sealed class SceneModel : ISceneTransformTarget
     public List<SceneMeshPart> Parts { get; } =
         new();
 
+    /// <summary>Gets or sets the selected source animation clip.</summary>
+    public int AnimationIndex { get; set; }
+
+    /// <summary>Gets or sets whether the selected clip advances automatically.</summary>
+    public bool AnimationPlaying { get; set; } = true;
+
+    /// <summary>Gets or sets whether playback wraps at the end of the clip.</summary>
+    public bool AnimationLooping { get; set; } = true;
+
+    /// <summary>Gets the current playback position in seconds.</summary>
+    public float AnimationTime { get; private set; }
+
+    public bool HasAnimations => SourceScene.Animations.Count > 0;
+
+    /// <summary>Samples the selected animation and returns true when geometry changed.</summary>
+    public bool AdvanceAnimation(float elapsedSeconds)
+    {
+        if (!HasAnimations || !AnimationPlaying)
+        {
+            return false;
+        }
+
+        AnimationIndex = Math.Clamp(AnimationIndex, 0, SourceScene.Animations.Count - 1);
+        SceneAnimationClip clip = SourceScene.Animations[AnimationIndex];
+        AnimationTime += MathF.Max(0.0f, elapsedSeconds);
+
+        if (clip.Duration > 0.0f && AnimationTime > clip.Duration)
+        {
+            if (AnimationLooping)
+            {
+                AnimationTime %= clip.Duration;
+            }
+            else
+            {
+                AnimationTime = clip.Duration;
+                AnimationPlaying = false;
+            }
+        }
+
+        clip.Apply(AnimationTime);
+        return true;
+    }
+
+    /// <summary>Seeks the selected animation and immediately samples it.</summary>
+    public void SetAnimationTime(float timeSeconds)
+    {
+        if (!HasAnimations)
+        {
+            AnimationTime = 0.0f;
+            return;
+        }
+
+        AnimationIndex = Math.Clamp(AnimationIndex, 0, SourceScene.Animations.Count - 1);
+        SceneAnimationClip clip = SourceScene.Animations[AnimationIndex];
+        AnimationTime = Math.Clamp(timeSeconds, 0.0f, clip.Duration);
+        clip.Apply(AnimationTime);
+    }
+
     /// <summary>Gets or sets the model translation in scene units.</summary>
     public Vector3 Position { get; set; }
 

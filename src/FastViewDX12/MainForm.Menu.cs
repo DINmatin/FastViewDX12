@@ -1413,11 +1413,8 @@ public sealed partial class MainForm
             UseWaitCursor =
                 true;
 
-            SceneData exportScene =
-                _sceneDocument.BuildRenderScene();
-
-            GltfSceneExporter.ExportGlb(
-                exportScene,
+            GltfSceneExporter.ExportDocumentGlb(
+                _sceneDocument,
                 dialog.FileName);
 
             if (saveCompliantCopy)

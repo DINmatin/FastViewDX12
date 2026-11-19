@@ -46,7 +46,10 @@ public static class GltfSceneLoader
                 "No scene found in glTF file.");
         }
 
-        var result = new SceneData();
+        var result = new SceneData
+        {
+            SourceGltfModel = model
+        };
         var materialIndices = new Dictionary<Material, int>();
 
         Dictionary<Material, float> emissiveStrengths =
@@ -64,6 +67,14 @@ public static class GltfSceneLoader
                 materialIndices,
                 emissiveStrengths,
                 ref defaultMaterialIndex);
+        }
+
+        foreach (Animation animation in model.LogicalAnimations)
+        {
+            result.Animations.Add(
+                new GltfSceneAnimationClip(
+                    animation,
+                    result.Meshes));
         }
 
         if (result.Materials.Count == 0)
@@ -190,6 +201,9 @@ public static class GltfSceneLoader
                     primitive,
                     "POSITION");
 
+            Vector3[] localPositions =
+                (Vector3[])positions.Clone();
+
             if (positions.Length == 0)
             {
                 primitiveNumber++;
@@ -205,6 +219,16 @@ public static class GltfSceneLoader
                 TryGetVector4Accessor(
                     primitive,
                     "TANGENT");
+
+            Vector4[] joints =
+                TryGetVector4Accessor(
+                    primitive,
+                    "JOINTS_0");
+
+            Vector4[] weights =
+                TryGetVector4Accessor(
+                    primitive,
+                    "WEIGHTS_0");
 
             Vector2[] texCoords0 =
                 TryGetVector2Accessor(
@@ -266,6 +290,30 @@ public static class GltfSceneLoader
                     indices,
                     world);
 
+            Vector3[] localNormals =
+                PrepareNormals(
+                    localPositions,
+                    normals.Length == localPositions.Length
+                        ? TryGetVector3Accessor(primitive, "NORMAL")
+                        : Array.Empty<Vector3>(),
+                    indices,
+                    Matrix4x4.Identity);
+
+            WriteRepairedNormalsToSource(
+                primitive,
+                localNormals);
+
+            Vector4[] localTangents =
+                PrepareTangents(
+                    normalMappingChangesTangentBasis
+                        ? Array.Empty<Vector4>()
+                        : sourceTangents,
+                    localPositions,
+                    localNormals,
+                    tangentTexCoords,
+                    indices,
+                    Matrix4x4.Identity);
+
             string meshName =
                 primitiveNumber == 0
                     ? nodeName
@@ -294,6 +342,15 @@ public static class GltfSceneLoader
                 $"material={materialIndex}");
 
             sceneData.Meshes.Add(mesh);
+
+            GltfSceneAnimationClip.RegisterBinding(
+                mesh,
+                node,
+                localPositions,
+                localNormals,
+                localTangents,
+                joints,
+                weights);
             primitiveNumber++;
         }
     }
@@ -1398,6 +1455,36 @@ public static class GltfSceneLoader
                 $"Could not read {semantic}: {ex.Message}");
 
             return Array.Empty<Vector4>();
+        }
+    }
+
+    /// <summary>
+    /// Writes normalized/reconstructed normals back into the retained glTF
+    /// model so an animation-preserving save also repairs malformed accessors.
+    /// </summary>
+    private static void WriteRepairedNormalsToSource(
+        MeshPrimitive primitive,
+        Vector3[] normals)
+    {
+        try
+        {
+            Accessor? accessor = primitive.GetVertexAccessor("NORMAL");
+            if (accessor == null || accessor.Count != normals.Length)
+            {
+                return;
+            }
+
+            IList<Vector3> values = accessor.AsVector3Array();
+            for (int index = 0; index < normals.Length; index++)
+            {
+                values[index] = normals[index];
+            }
+
+            accessor.UpdateBounds();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Could not update repaired NORMAL accessor: {ex.Message}");
         }
     }
 

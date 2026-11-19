@@ -4,6 +4,19 @@
 
 No unreleased changes yet.
 
+## 1.7.0 - 2026-11-19
+
+### Added
+
+* Added glTF skeletal animation playback with joint-weight skinning and automatic playback of embedded GLB clips.
+* Added an Animation Inspector with clip selection, separate Play and Pause controls, Restart, Loop, timeline scrubbing, and a live time display.
+
+### Changed
+
+* Animation frames update existing GPU vertex buffers without recreating materials, textures, descriptors, or index buffers.
+* Scene export and **Save compliant GLB** now preserve animation clips, skeletons, skins, joints, weights, and clip names for animated single-model documents.
+* Repaired normals are written back into animation-preserving compliant exports.
+
 ## 1.6.0 - 2026-11-19
 
 ### Added

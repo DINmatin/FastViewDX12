@@ -6,9 +6,9 @@ FastView is a lightweight Windows viewer and scene-assembly tool for **GLB**, **
 
 ## Download
 
-**[Download the latest FastView installer](https://github.com/DINmatin/FastViewDX12/releases/latest/download/FastView_Setup_1.6.0.exe)**
+**[Download the latest FastView installer](https://github.com/DINmatin/FastViewDX12/releases/latest/download/FastView_Setup_1.7.0.exe)**
 
-Download the installer, start `FastView_Setup_1.6.0.exe`, and follow the setup instructions.
+Download the installer, start `FastView_Setup_1.7.0.exe`, and follow the setup instructions.
 
 After installation, GLB, glTF, FBX, STL, and OBJ files can be opened with FastView and displayed as thumbnails in Windows Explorer.
 
@@ -117,7 +117,7 @@ dotnet build .\FastView.slnx -c Release
 Create a self-contained release payload and ZIP:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\build\BuildRelease.ps1 -Version 1.6.0
+powershell -ExecutionPolicy Bypass -File .\build\BuildRelease.ps1 -Version 1.7.0
 ```
 
 Create the Windows installer:
